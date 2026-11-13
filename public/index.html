@@ -1229,7 +1229,7 @@ function exportDeck() {
 
 
 /* =========================================================
-   雲端同步（Cloudflare Pages Functions + D1）
+   雲端同步（Cloudflare Workers + D1）
    - 所有變更先存本機，再排入待上傳佇列，有網路時自動上傳
    - 每題有 updatedAt，較新的一方勝出；刪除會留下刪除標記
    - 用檔案直接開啟（file://）或找不到 /api 時，只用本機儲存
