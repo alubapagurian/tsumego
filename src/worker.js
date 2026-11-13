@@ -5,9 +5,10 @@
  * 只有 /api/* 會進到這支程式（見 wrangler.jsonc 的 run_worker_first）。
  *
  *   GET  /api/health   檢查連線與登入狀態
- *   GET  /api/deck     取得整個題庫（含已刪除的標記）
- *   POST /api/sync     上傳本機的變更，回傳伺服器上最新的整個題庫
- *        body: { problems: [ {id, updatedAt, ...} ], deletes: [ {id, deletedAt} ] }
+ *   GET  /api/deck?since=T   取得伺服器時間 T 之後有變動的題目（T=0 表示全部，含刪除標記）
+ *   POST /api/sync           上傳本機的變更，回傳 since 之後有變動的題目
+ *        body: { problems: [ {id, updatedAt, ...} ], deletes: [ {id, deletedAt} ], since }
+ *   回傳 { problems, now }：下次同步時把 now 當成 since，就只會拿到新的變動
  *
  * 需要的設定：
  *   wrangler.jsonc：D1 資料庫綁定（名稱 DB，填入 database_id）
@@ -19,7 +20,8 @@ const SCHEMA = `CREATE TABLE IF NOT EXISTS problems (
   id         TEXT PRIMARY KEY,
   data       TEXT NOT NULL,
   updated_at INTEGER NOT NULL,
-  deleted    INTEGER NOT NULL DEFAULT 0
+  deleted    INTEGER NOT NULL DEFAULT 0,
+  server_ts  INTEGER NOT NULL DEFAULT 0
 )`;
 const MAX_ITEMS = 200;          // 每次同步最多幾筆（前端會分批）
 const MAX_DATA = 200 * 1024;    // 單題資料上限
@@ -42,7 +44,10 @@ async function handleApi(request, env, path) {
     await ensureSchema(env.DB);
 
     if (path === 'health' && request.method === 'GET') return json({ ok: true });
-    if (path === 'deck' && request.method === 'GET') return json({ problems: await readDeck(env.DB) });
+    if (path === 'deck' && request.method === 'GET') {
+      const now = Date.now();
+      return json({ problems: await readDeck(env.DB, Number(new URL(request.url).searchParams.get('since')) || 0), now });
+    }
     if (path === 'sync' && request.method === 'POST') return json(await sync(env.DB, await request.json()));
     return json({ error: 'not_found' }, 404);
   } catch (err) {
@@ -55,11 +60,14 @@ let schemaReady = false;
 async function ensureSchema(db) {
   if (schemaReady) return;
   await db.prepare(SCHEMA).run();
+  // 舊版資料表沒有 server_ts 欄位：補上（已存在時會出錯，忽略即可）
+  try { await db.prepare('ALTER TABLE problems ADD COLUMN server_ts INTEGER NOT NULL DEFAULT 0').run(); } catch (e) {}
+  await db.prepare('CREATE INDEX IF NOT EXISTS idx_problems_server_ts ON problems(server_ts)').run();
   schemaReady = true;
 }
 
-async function readDeck(db) {
-  const { results } = await db.prepare('SELECT id, data, updated_at, deleted FROM problems').all();
+async function readDeck(db, since = 0) {
+  const { results } = await db.prepare('SELECT id, data, updated_at, deleted FROM problems WHERE server_ts >= ?1').bind(since).all();
   return results.map(r => ({
     id: r.id,
     updatedAt: r.updated_at,
@@ -74,8 +82,9 @@ async function sync(db, body) {
   if (problems.length + deletes.length > MAX_ITEMS) throw new Error(`一次最多同步 ${MAX_ITEMS} 筆`);
 
   // 只有比伺服器上新（或一樣新）的資料才會寫入
-  const upsert = `INSERT INTO problems (id, data, updated_at, deleted) VALUES (?1, ?2, ?3, ?4)
-    ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, deleted = excluded.deleted
+  const now = Date.now();
+  const upsert = `INSERT INTO problems (id, data, updated_at, deleted, server_ts) VALUES (?1, ?2, ?3, ?4, ?5)
+    ON CONFLICT(id) DO UPDATE SET data = excluded.data, updated_at = excluded.updated_at, deleted = excluded.deleted, server_ts = excluded.server_ts
     WHERE excluded.updated_at >= problems.updated_at`;
   const stmts = [];
   for (const p of problems) {
@@ -83,15 +92,16 @@ async function sync(db, body) {
     if (!id || !ts) continue;
     const data = JSON.stringify(p);
     if (data.length > MAX_DATA) continue;
-    stmts.push(db.prepare(upsert).bind(id, data, ts, 0));
+    stmts.push(db.prepare(upsert).bind(id, data, ts, 0, now));
   }
   for (const d of deletes) {
     const id = cleanId(d?.id), ts = cleanTs(d?.deletedAt);
     if (!id || !ts) continue;
-    stmts.push(db.prepare(upsert).bind(id, '', ts, 1));
+    stmts.push(db.prepare(upsert).bind(id, '', ts, 1, now));
   }
   if (stmts.length) await db.batch(stmts);
-  return { ok: true, applied: stmts.length, problems: await readDeck(db) };
+  const since = Number(body?.since) || 0;
+  return { ok: true, applied: stmts.length, problems: await readDeck(db, since), now };
 }
 
 const cleanId = v => (typeof v === 'string' && v.length > 0 && v.length <= 120 ? v : null);

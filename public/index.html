@@ -404,6 +404,7 @@
 /* =========================================================
    基本設定與座標
    ========================================================= */
+const APP_VERSION = '2026.11.14b';             // 顯示在題庫頁，用來確認 iPad 載入的是不是最新版
 const LETTERS = 'ABCDEFGHJKLMNOPQRST';     // 跳過 I（圍棋慣例）
 const STORE_KEY = 'go_tsumego_deck_v3';
 const OLD_STORE_KEYS = ['go_tsumego_deck_v2', 'go_tsumego_deck'];
@@ -587,8 +588,15 @@ function normalizeHistory(h) {
   // 舊版紀錄（含縮圖）
   return { t: null, dateText: h.date || '', ok: !!h.isSuccess, text: h.resultText || '', mode: h.modeText || '', thumb: h.thumbnail || null };
 }
-/** 檢查題目是否能照正解下完；回傳錯誤訊息或 null */
+/** 檢查題目是否能照正解下完；回傳錯誤訊息或 null（結果快取在題目物件上，題目內容改變時會換成新物件） */
+const issueCache = new WeakMap();
 function problemIssue(p) {
+  if (issueCache.has(p)) return issueCache.get(p);
+  const r = problemIssue0(p);
+  issueCache.set(p, r);
+  return r;
+}
+function problemIssue0(p) {
   const pos = computePosition(p, []);
   for (let i = 0; i < pos.grid.length; i++) {
     if (pos.grid[i] && groupAt(pos.grid, pos.size, i).libs === 0)
@@ -621,14 +629,22 @@ function loadDeck() {
   const out = raw.map((r, i) => normalizeProblem(r, i).problem).filter(Boolean);
   return out.length ? out : DEFAULT_PROBLEMS.map((r, i) => normalizeProblem(r, i).problem);
 }
-function saveDeck() {
+let saveTimer = null;
+function saveDeck() {   // 題庫很大時，存檔很花時間：合併成稍後一次寫入
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveDeckNow, 400);
+}
+function saveDeckNow() {
+  clearTimeout(saveTimer); saveTimer = null;
   try { localStorage.setItem(STORE_KEY, JSON.stringify(deck)); }
   catch (e) { toast('儲存空間不足，請匯出備份後清除部分作答紀錄'); }
 }
+window.addEventListener('pagehide', () => { if (saveTimer) saveDeckNow(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && saveTimer) saveDeckNow(); });
 const UNGROUPED = '未分組';
 const groupOf = p => p.group || UNGROUPED;
 const groups = () => [...new Set(deck.map(groupOf))];
-const categories = (g = 'ALL') => [...new Set(deck.filter(p => g === 'ALL' || groupOf(p) === g).map(p => p.category))];
+const categories = (g = 'ALL') => { const set = new Set(); for (const p of deck) if (g === 'ALL' || groupOf(p) === g) set.add(p.category); return [...set]; };
 const catLabel = p => (p.group ? `${p.group} · ${p.category}` : p.category);
 const findProblem = id => deck.find(p => p.id === id);
 
@@ -1046,14 +1062,23 @@ function renderFilterSelects() {
   const inGroup = deck.filter(p => S.group === 'ALL' || groupOf(p) === S.group);
   const cats = categories(S.group);
   if (S.cat !== 'ALL' && !cats.includes(S.cat)) S.cat = 'ALL';
+  const gCount = {}, cCount = {};
+  deck.forEach(p => { gCount[groupOf(p)] = (gCount[groupOf(p)] || 0) + 1; });
+  inGroup.forEach(p => { cCount[p.category] = (cCount[p.category] || 0) + 1; });
   const gHtml = `<option value="ALL">全部大類（${deck.length}）</option>` +
-    gs.map(g => `<option value="${esc(g)}">${esc(g)}（${deck.filter(p => groupOf(p) === g).length}）</option>`).join('');
+    gs.map(g => `<option value="${esc(g)}">${esc(g)}（${gCount[g]}）</option>`).join('');
   const cHtml = `<option value="ALL">全部子類（${inGroup.length}）</option>` +
-    cats.map(c => `<option value="${esc(c)}">${esc(c)}（${inGroup.filter(p => p.category === c).length}）</option>`).join('');
-  ['playGroup', 'libGroup'].forEach(id => { $(id).innerHTML = gHtml; $(id).value = S.group; });
-  ['playCat', 'libCat'].forEach(id => { $(id).innerHTML = cHtml; $(id).value = S.cat; });
-  $('groupList').innerHTML = gs.filter(g => g !== UNGROUPED).map(g => `<option value="${esc(g)}">`).join('');
-  $('catList').innerHTML = categories().map(c => `<option value="${esc(c)}">`).join('');
+    cats.map(c => `<option value="${esc(c)}">${esc(c)}（${cCount[c]}）</option>`).join('');
+  // 內容沒變就不重建選單（每次落子都會呼叫）
+  if (renderFilterSelects.last !== gHtml + cHtml + S.group + S.cat) {
+    renderFilterSelects.last = gHtml + cHtml + S.group + S.cat;
+    ['playGroup', 'libGroup'].forEach(id => { $(id).innerHTML = gHtml; $(id).value = S.group; });
+    ['playCat', 'libCat'].forEach(id => { $(id).innerHTML = cHtml; $(id).value = S.cat; });
+  }
+  if (S.tab === 'edit') {
+    $('groupList').innerHTML = gs.filter(g => g !== UNGROUPED).map(g => `<option value="${esc(g)}">`).join('');
+    $('catList').innerHTML = categories().map(c => `<option value="${esc(c)}">`).join('');
+  }
 }
 function onFilterChange(kind, v) {
   if (kind === 'group') { S.group = v; S.cat = 'ALL'; } else S.cat = v;
@@ -1181,12 +1206,16 @@ function renderLib() {
   renderFilterSelects();
   const q = $('libSearch').value.trim().toLowerCase();
   const list = pool().filter(p => !q || p.id.toLowerCase().includes(q) || p.title.toLowerCase().includes(q));
-  $('libCount').textContent = `共 ${list.length} 題` + (list.length !== deck.length ? `（題庫總數 ${deck.length}）` : '');
+  $('libCount').textContent = `共 ${list.length} 題` + (list.length !== deck.length ? `（題庫總數 ${deck.length}）` : '') + `　·　版本 ${APP_VERSION}`;
   const box = $('libList');
   box.innerHTML = '';
   if (!list.length) { box.innerHTML = '<div class="empty" style="padding:24px">沒有符合的題目</div>'; return; }
+  // 一次只畫一部分（上千題時整頁畫完會很慢）
+  const key = S.group + '|' + S.cat + '|' + q;
+  if (renderLib.key !== key) { renderLib.key = key; renderLib.limit = 60; }
+  const shown = list.slice(0, renderLib.limit);
   const frag = document.createDocumentFragment(), draws = [];
-  list.forEach(p => {
+  shown.forEach(p => {
     const issue = problemIssue(p);
     const row = document.createElement('div');
     row.className = 'lib-item' + (p.id === S.current ? ' current' : '');
@@ -1206,11 +1235,18 @@ function renderLib() {
     frag.appendChild(row);
     draws.push([row.querySelector('canvas'), { ...computePosition(p, []), marks: [], targets: targetIdx(p) }]);
   });
+  if (list.length > shown.length) {
+    const more = document.createElement('div');
+    more.className = 'lib-item';
+    more.innerHTML = `<button class="btn" style="width:100%" data-act="more">再顯示 ${Math.min(60, list.length - shown.length)} 題（還有 ${list.length - shown.length} 題）</button>`;
+    frag.appendChild(more);
+  }
   box.appendChild(frag);
   draws.forEach(([cv, v]) => drawBoard(cv, v, { labels: false, w: 84, h: 54 }));
 }
 function onLibClick(e) {
   const t = e.target.closest('[data-act]'); if (!t) return;
+  if (t.dataset.act === 'more') { const y = window.scrollY; renderLib.limit += 60; renderLib(); window.scrollTo(0, y); return; }
   const id = t.closest('.lib-item').dataset.id, p = findProblem(id);
   if (!p) return;
   if (t.dataset.act === 'play') { startProblem(id); switchTab('play'); }
@@ -1227,6 +1263,16 @@ function onLibClick(e) {
 }
 
 /* ---------- 匯入 / 匯出 ---------- */
+/** 把舊題目的作答進度合併到新題目：紀錄合在一起，熟練度以最近作答的那份為準 */
+function mergeProgress(p, olds) {
+  const hist = olds.flatMap(o => o.history || []);
+  const seen = new Set();
+  p.history = hist.filter(h => { const k = (h.t || h.dateText) + '|' + h.text; if (seen.has(k)) return false; seen.add(k); return true; })
+    .sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 30);
+  const lastT = o => Math.max(0, ...(o.history || []).map(h => h.t || 0));
+  const src = olds.slice().sort((a, b) => lastT(b) - lastT(a) || (b.level - a.level))[0];
+  p.level = src.level; p.streak = src.streak; p.penalty = src.penalty;
+}
 function runImport(text) {
   const out = $('importResult');
   let data;
@@ -1252,16 +1298,15 @@ function runImport(text) {
   ok.forEach(p => {
     if (seen.has(p.id)) { errors.push(`${p.id}：檔案裡題號重複，只保留第一題`); return; }
     seen.add(p.id);
-    let old = findProblem(p.id);
-    if (!old && p.group) {
-      // 以前匯入時還沒有大類（題號是「死活-1」），現在變成「階三-死活-1」：沿用進度並取代舊的那題
-      const legacy = deck.find(q => !q.group && q.category === p.category && q.id === p.title);
-      if (legacy) { old = legacy; markDeleted(legacy.id); migrated++; }
-    }
-    if (old) {
-      if (!p.history.length) { p.level = old.level; p.streak = old.streak; p.penalty = old.penalty; p.history = old.history; }
-      deck[deck.indexOf(old)] = p; updated++;
-    } else { deck.push(p); added++; }
+    const same = findProblem(p.id);
+    // 舊版沒有大類時匯入的同一題（題號是「死活-1」）：合併進度後移除
+    const legacy = p.group ? deck.find(q => q !== same && !q.group && q.category === p.category && q.id === p.title) : null;
+    const olds = [same, legacy].filter(Boolean);
+    if (olds.length && !p.history.length) mergeProgress(p, olds);
+    if (legacy) { deck = deck.filter(q => q !== legacy); markDeleted(legacy.id); migrated++; }
+    if (same) { deck[deck.indexOf(same)] = p; updated++; }
+    else if (legacy) { deck.push(p); updated++; }
+    else { deck.push(p); added++; }
     touch(p);
   });
   saveDeck();
@@ -1309,13 +1354,16 @@ function exportDeck() {
 const PENDING_KEY = 'tsumego_pending_v1';
 const PW_KEY = 'tsumego_sync_password';
 const getPw = () => { try { return localStorage.getItem(PW_KEY) || ''; } catch (e) { return ''; } };
-const setPw = v => { try { v ? localStorage.setItem(PW_KEY, v) : localStorage.removeItem(PW_KEY); } catch (e) {} };
+const setPw = v => { try { v ? localStorage.setItem(PW_KEY, v) : localStorage.removeItem(PW_KEY); localStorage.removeItem('tsumego_sync_ts'); } catch (e) {} if (typeof sync !== 'undefined') sync.since = 0; };
 const SYNC_CHUNK = 60;
+const SYNC_TS_KEY = 'tsumego_sync_ts';   // 上次同步時的伺服器時間：之後只下載這之後的變動
 let pending = (() => {
   try { const v = JSON.parse(localStorage.getItem(PENDING_KEY)); if (v && v.up && v.del) return v; } catch (e) {}
   return { up: {}, del: {} };
 })();
-const sync = { state: location.protocol === 'file:' ? 'local' : 'idle', busy: false, again: false, timer: null, last: 0 };
+const sync = { state: location.protocol === 'file:' ? 'local' : 'idle', busy: false, again: false, timer: null, last: 0,
+  since: (() => { try { return Number(localStorage.getItem(SYNC_TS_KEY)) || 0; } catch (e) { return 0; } })() };
+function setSince(v) { sync.since = v; try { localStorage.setItem(SYNC_TS_KEY, String(v)); } catch (e) {} }
 
 function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); } catch (e) {} }
 function touch(p) {
@@ -1372,22 +1420,26 @@ async function runSync() {
     Object.keys(pending.up).forEach(id => { if (!findProblem(id)) delete pending.up[id]; });
     const ups = Object.keys(pending.up).map(findProblem).map(serializeProblem);
     const dels = Object.entries(pending.del).map(([id, deletedAt]) => ({ id, deletedAt }));
-    let rows = null;
+    const full = !sync.since;
+    const got = new Map();   // 伺服器回傳的變動（同一題以最後一次為準）
+    let now = null;
+    const take = res => { (res.problems || []).forEach(r => got.set(r.id, r)); if (res.now) now = res.now; };
     if (!ups.length && !dels.length) {
-      rows = (await api('GET', 'deck')).problems;
+      take(await api('GET', 'deck?since=' + sync.since));
     } else {
       for (let k = 0; k < ups.length + dels.length; k += SYNC_CHUNK) {
         const probs = ups.slice(k, k + SYNC_CHUNK);
         const ds = dels.slice(Math.max(0, k - ups.length), Math.max(0, k + SYNC_CHUNK - ups.length));
-        const res = await api('POST', 'sync', { problems: probs, deletes: ds });
-        rows = res.problems;
+        // 第一批用原本的 since；後面的批次只需要這次上傳期間的變動
+        take(await api('POST', 'sync', { problems: probs, deletes: ds, since: k === 0 ? sync.since : (now || sync.since) }));
         // 上傳成功：清除這些項目（若上傳期間又被修改則保留）
         probs.forEach(p => { if (pending.up[p.id] === p.updatedAt) delete pending.up[p.id]; });
         ds.forEach(d => { if (pending.del[d.id] === d.deletedAt) delete pending.del[d.id]; });
         savePending();
       }
     }
-    mergeServer(rows || []);
+    mergeServer([...got.values()], full);
+    if (now) setSince(now);   // 舊版伺服器沒有 now：維持每次完整同步
     sync.last = Date.now();
     setSyncState(Object.keys(pending.up).length || Object.keys(pending.del).length ? 'busy' : 'ok');
   } catch (e) {
@@ -1401,12 +1453,12 @@ async function runSync() {
     if (sync.again || (sync.state === 'busy')) { sync.again = false; scheduleSync(300); }
   }
 }
-function mergeServer(rows) {
+function mergeServer(rows, full) {
   const onServer = new Set();
   let changed = false;
   const live = rows.filter(r => !r.deleted);
   // 新裝置（只有內建範例）而雲端已有題庫：直接採用雲端，不上傳範例
-  const adoptServer = deckPristine && live.length > 0;
+  const adoptServer = full && deckPristine && live.length > 0;
   for (const r of rows) {
     onServer.add(r.id);
     const local = findProblem(r.id);
@@ -1423,9 +1475,9 @@ function mergeServer(rows) {
       changed = true;
     }
   }
-  // 本機有、雲端沒有的題目
+  // 本機有、雲端沒有的題目（只有完整同步時才知道雲端有哪些）
   let needPush = false;
-  for (const p of [...deck]) {
+  if (full) for (const p of [...deck]) {
     if (onServer.has(p.id) || pending.up[p.id]) continue;
     if (adoptServer) { deck = deck.filter(x => x !== p); changed = true; continue; }
     p.updatedAt = p.updatedAt || Date.now();
@@ -1439,6 +1491,7 @@ function mergeServer(rows) {
   }
   if (needPush) { savePending(); scheduleSync(300); }
   if (changed) {
+    renderLib.key = null;
     saveDeck();
     if (!findProblem(S.current)) startProblem(deck[0].id);
     else if (S.tab === 'play' && play.state === 'playing' && !play.moves.length) startProblem();
@@ -1540,7 +1593,8 @@ $('edCat').addEventListener('change', refreshId);
 $('edGroup').addEventListener('change', refreshId);
 
 $('libList').addEventListener('click', onLibClick);
-$('libSearch').addEventListener('input', renderLib);
+let searchTimer;
+$('libSearch').addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(renderLib, 200); });
 $('btnLibNew').onclick = () => { newEditor(); switchTab('edit'); };
 $('btnExport').onclick = exportDeck;
 $('btnImport').onclick = () => { $('importResult').innerHTML = ''; $('importModal').classList.add('open'); };
