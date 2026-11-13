@@ -152,8 +152,14 @@
     background: var(--surface); padding: 0 12px; width: 100%;
   }
   textarea { padding: 10px 12px; resize: vertical; }
-  label.field { display: block; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
-  label.field > input, label.field > select, label.field > textarea { margin-top: 4px; color: var(--ink); font-size: 16px; }
+  .field { display: block; margin-bottom: 10px; }
+  .field > label { display: block; font-size: 14px; color: var(--muted); }
+  .field > input, .field > select, .field > textarea { margin-top: 4px; color: var(--ink); font-size: 16px; }
+  /* iPad：文字欄位要能長按移動游標、選取部分文字 */
+  input, textarea {
+    -webkit-user-select: text; user-select: text;
+    -webkit-touch-callout: default; touch-action: auto;
+  }
   .field-row { display: flex; gap: 10px; }
   .field-row > * { flex: 1; min-width: 0; }
 
@@ -312,11 +318,11 @@
     <div class="card">
       <h3>題目資訊</h3>
       <div class="field-row">
-        <label class="field">分類<input type="text" id="edCat" list="catList" placeholder="例如：階1"></label>
-        <label class="field">題號<input type="text" id="edId" placeholder="自動"></label>
+        <div class="field"><label for="edCat">分類</label><input type="text" id="edCat" list="catList" placeholder="例如：階1"></div>
+        <div class="field"><label for="edId">題號</label><input type="text" id="edId" placeholder="自動"></div>
       </div>
-      <label class="field">名稱<input type="text" id="edTitle" placeholder="例如：倒撲吃子"></label>
-      <label class="field">說明 / 提示<textarea id="edDesc" rows="2" placeholder="例如：黑先，注意撲的手筋"></textarea></label>
+      <div class="field"><label for="edTitle">名稱</label><input type="text" id="edTitle" placeholder="例如：倒撲吃子"></div>
+      <div class="field"><label for="edDesc">說明 / 提示</label><textarea id="edDesc" rows="2" placeholder="例如：黑先，注意撲的手筋"></textarea></div>
       <button class="btn primary" style="width:100%" id="btnEdSave">儲存題目</button>
     </div>
     <datalist id="catList"></datalist>
