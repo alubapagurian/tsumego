@@ -143,9 +143,8 @@
   .status.bad { background: var(--bad-soft); } .status.bad b { color: var(--bad); }
   .status.warn { background: var(--warn-soft); }
 
-  .next-row { display: flex; gap: 8px; }
-  .next-row select { flex: 1; min-width: 0; }
-  .next-row .btn { flex: 1.2; }
+  .filter-row { display: flex; gap: 8px; }
+  .filter-row select { flex: 1; min-width: 0; }
 
   select, input[type=text], textarea {
     min-height: 44px; border: 1px solid var(--line); border-radius: 10px;
@@ -188,7 +187,7 @@
   /* ---------- 題庫 ---------- */
   .lib { max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
   .lib-tools { display: flex; gap: 8px; flex-wrap: wrap; }
-  .lib-tools select { width: auto; flex: 0 1 180px; }
+  .lib-tools select { width: auto; flex: 0 1 170px; }
   .lib-tools input { flex: 1 1 160px; width: auto; }
   .lib-list { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
   .lib-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); }
@@ -264,10 +263,11 @@
       <button class="btn hidden" id="btnCheck">對答案</button>
     </div>
 
-    <div class="next-row">
-      <select id="playFilter" aria-label="出題範圍"></select>
-      <button class="btn primary" id="btnNext">下一題</button>
+    <div class="filter-row">
+      <select id="playGroup" aria-label="大類"></select>
+      <select id="playCat" aria-label="子類"></select>
     </div>
+    <button class="btn primary" id="btnNext" style="width:100%">下一題</button>
 
     <div class="card">
       <div class="mastery">
@@ -319,14 +319,16 @@
     <div class="card">
       <h3>題目資訊</h3>
       <div class="field-row">
-        <div class="field"><label for="edCat">分類</label><input type="text" id="edCat" list="catList" placeholder="例如：階1"></div>
-        <div class="field"><label for="edId">題號</label><input type="text" id="edId" placeholder="自動"></div>
+        <div class="field"><label for="edGroup">大類</label><input type="text" id="edGroup" list="groupList" placeholder="例如：階三"></div>
+        <div class="field"><label for="edCat">子類</label><input type="text" id="edCat" list="catList" placeholder="例如：死活"></div>
       </div>
+      <div class="field"><label for="edId">題號</label><input type="text" id="edId" placeholder="自動"></div>
       <div class="field"><label for="edTitle">名稱</label><input type="text" id="edTitle" placeholder="例如：倒撲吃子"></div>
       <div class="field"><label for="edDesc">說明 / 提示</label><textarea id="edDesc" rows="2" placeholder="例如：黑先，注意撲的手筋"></textarea></div>
       <button class="btn primary" style="width:100%" id="btnEdSave">儲存題目</button>
     </div>
     <datalist id="catList"></datalist>
+    <datalist id="groupList"></datalist>
   </aside>
 </main>
 
@@ -334,7 +336,8 @@
 <main id="view-lib" class="view">
   <div class="lib">
     <div class="lib-tools">
-      <select id="libFilter" aria-label="分類"></select>
+      <select id="libGroup" aria-label="大類"></select>
+      <select id="libCat" aria-label="子類"></select>
       <input type="text" id="libSearch" placeholder="搜尋題號或名稱">
       <button class="btn" id="btnImport">匯入</button>
       <button class="btn" id="btnExport">匯出</button>
@@ -485,7 +488,7 @@ function computePosition(p, moves) {
 /* =========================================================
    題目資料：統一格式、相容舊格式、驗證
    統一格式：
-   { id, category, title, desc, boardSize,
+   { id, group, category, title, desc, boardSize,     ← group＝大類（例：階三），category＝子類（例：死活）
      initialBlack:["C3",...], initialWhite:[...],
      solution:[{coord:"B2", color:"B", note?}],
      targets?:["D3",...]   ← 攻殺題要吃掉的棋子（畫成雙圓）
@@ -555,6 +558,7 @@ function normalizeProblem(raw, idx) {
   return {
     problem: {
       id: String(raw.id ?? `P-${Date.now().toString(36)}-${idx}`),
+      group: String(raw.group ?? raw.book ?? '').trim(),
       category: String(raw.category || '未分類'),
       title: String(raw.title || raw.id || '未命名題目'),
       desc: String(raw.desc ?? raw.description ?? ''),
@@ -599,10 +603,10 @@ function problemIssue(p) {
    題庫儲存
    ========================================================= */
 const DEFAULT_PROBLEMS = [
-  { id: '範例-1', category: '範例', title: '提子', desc: '黑先。白二子只剩一口氣，把它吃掉。',
+  { id: '範例-1', group: '範例', category: '入門', title: '提子', desc: '黑先。白二子只剩一口氣，把它吃掉。',
     boardSize: 9, initialBlack: ['A2', 'B2', 'C2'], initialWhite: ['A1', 'B1'],
     solution: [{ coord: 'C1', color: 'B', note: '黑 1 提掉白二子。' }] },
-  { id: '範例-2', category: '範例', title: '點殺直三', desc: '白先殺。黑棋的眼位是一線直三。',
+  { id: '範例-2', group: '範例', category: '入門', title: '點殺直三', desc: '白先殺。黑棋的眼位是一線直三。',
     boardSize: 9, initialBlack: ['A2', 'B2', 'C2', 'D2', 'D1'], initialWhite: ['A3', 'B3', 'C3', 'D3', 'E2', 'E1'],
     solution: [{ coord: 'B1', color: 'W', note: '白 1 點在直三中央，黑棋做不出兩隻眼。' }] }
 ];
@@ -621,7 +625,11 @@ function saveDeck() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(deck)); }
   catch (e) { toast('儲存空間不足，請匯出備份後清除部分作答紀錄'); }
 }
-const categories = () => [...new Set(deck.map(p => p.category))];
+const UNGROUPED = '未分組';
+const groupOf = p => p.group || UNGROUPED;
+const groups = () => [...new Set(deck.map(groupOf))];
+const categories = (g = 'ALL') => [...new Set(deck.filter(p => g === 'ALL' || groupOf(p) === g).map(p => p.category))];
+const catLabel = p => (p.group ? `${p.group} · ${p.category}` : p.category);
 const findProblem = id => deck.find(p => p.id === id);
 
 /* =========================================================
@@ -770,7 +778,8 @@ document.addEventListener('gesturestart', e => { if (e.target.closest && e.targe
 const S = {
   tab: 'play',
   mode: 'AUTO',        // AUTO 自動應答 / FREE 自由擺子
-  filter: 'ALL',
+  group: 'ALL',        // 大類篩選
+  cat: 'ALL',          // 子類篩選
   current: deck[0].id,
 };
 let play = null;
@@ -812,7 +821,7 @@ function withMarks(pos, ghosts, p) {
 
 function renderPlay() {
   const p = curProblem();
-  $('pCat').textContent = p.category;
+  $('pCat').textContent = catLabel(p);
   $('pId').textContent = p.id;
   $('pTitle').textContent = p.title;
   $('pDesc').textContent = p.desc;
@@ -1020,7 +1029,7 @@ function openReview(p, h) {
 }
 
 /* ---------- 出題範圍 / 下一題 ---------- */
-const pool = () => (S.filter === 'ALL' ? deck : deck.filter(p => p.category === S.filter));
+const pool = () => deck.filter(p => (S.group === 'ALL' || groupOf(p) === S.group) && (S.cat === 'ALL' || p.category === S.cat));
 function weight(p) { return Math.floor(100 / (1 + 1.5 * p.level)) + p.penalty; }
 function nextProblem() {
   let list = pool().filter(p => !problemIssue(p));
@@ -1032,15 +1041,22 @@ function nextProblem() {
   startProblem(pick.id);
 }
 function renderFilterSelects() {
-  const cats = categories();
-  if (S.filter !== 'ALL' && !cats.includes(S.filter)) S.filter = 'ALL';
-  const html = `<option value="ALL">全部分類（${deck.length}）</option>` +
-    cats.map(c => `<option value="${esc(c)}">${esc(c)}（${deck.filter(p => p.category === c).length}）</option>`).join('');
-  ['playFilter', 'libFilter'].forEach(id => { $(id).innerHTML = html; $(id).value = S.filter; });
-  $('catList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+  const gs = groups();
+  if (S.group !== 'ALL' && !gs.includes(S.group)) { S.group = 'ALL'; S.cat = 'ALL'; }
+  const inGroup = deck.filter(p => S.group === 'ALL' || groupOf(p) === S.group);
+  const cats = categories(S.group);
+  if (S.cat !== 'ALL' && !cats.includes(S.cat)) S.cat = 'ALL';
+  const gHtml = `<option value="ALL">全部大類（${deck.length}）</option>` +
+    gs.map(g => `<option value="${esc(g)}">${esc(g)}（${deck.filter(p => groupOf(p) === g).length}）</option>`).join('');
+  const cHtml = `<option value="ALL">全部子類（${inGroup.length}）</option>` +
+    cats.map(c => `<option value="${esc(c)}">${esc(c)}（${inGroup.filter(p => p.category === c).length}）</option>`).join('');
+  ['playGroup', 'libGroup'].forEach(id => { $(id).innerHTML = gHtml; $(id).value = S.group; });
+  ['playCat', 'libCat'].forEach(id => { $(id).innerHTML = cHtml; $(id).value = S.cat; });
+  $('groupList').innerHTML = gs.filter(g => g !== UNGROUPED).map(g => `<option value="${esc(g)}">`).join('');
+  $('catList').innerHTML = categories().map(c => `<option value="${esc(c)}">`).join('');
 }
-function onFilterChange(v) {
-  S.filter = v;
+function onFilterChange(kind, v) {
+  if (kind === 'group') { S.group = v; S.cat = 'ALL'; } else S.cat = v;
   const list = pool();
   if (list.length && !list.some(p => p.id === S.current)) startProblem(list[0].id);
   else renderPlay();
@@ -1064,16 +1080,18 @@ function newEditor(fromProblem) {
     tool: 'B',
   };
   $('edHeading').textContent = p ? `編輯：${p.id}` : '新增題目';
-  $('edCat').value = p ? p.category : (S.filter !== 'ALL' ? S.filter : (categories()[0] || ''));
-  $('edId').value = p ? p.id : suggestId($('edCat').value);
+  $('edGroup').value = p ? (p.group || '') : (S.group !== 'ALL' && S.group !== UNGROUPED ? S.group : '');
+  $('edCat').value = p ? p.category : (S.cat !== 'ALL' ? S.cat : (categories(S.group)[0] || ''));
+  $('edId').value = p ? p.id : suggestId($('edGroup').value, $('edCat').value);
   $('edTitle').value = p ? p.title : '';
   $('edDesc').value = p ? p.desc : '';
   renderEditor();
 }
-function suggestId(cat) {
-  const prefix = (cat || 'P').trim() || 'P';
-  let n = deck.filter(p => p.category === cat).length + 1, id;
-  do { id = `${prefix}-${String(n).padStart(3, '0')}`; n++; } while (findProblem(id));
+function suggestId(group, cat) {
+  group = (group || '').trim(); cat = (cat || '').trim() || 'P';
+  const prefix = [group, cat].filter(Boolean).join('-');
+  let n = deck.filter(p => (p.group || '') === group && p.category === cat).length + 1, id;
+  do { id = `${prefix}-${n}`; n++; } while (findProblem(id));
   return id;
 }
 const edProblem = () => ({ boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves, targets: ed.targets });
@@ -1123,12 +1141,13 @@ function setFirst(c) {
   renderEditor();
 }
 function saveEditor() {
-  const id = $('edId').value.trim() || suggestId($('edCat').value);
+  const group = $('edGroup').value.trim();
   const category = $('edCat').value.trim() || '未分類';
+  const id = $('edId').value.trim() || suggestId(group, category);
   if (!ed.black.length && !ed.white.length) return toast('請先在棋盤上擺出題目的棋子');
   if (!ed.moves.length) return toast('請至少錄製 1 手正解');
   const cand = normalizeProblem({
-    id, category, title: $('edTitle').value.trim() || id, desc: $('edDesc').value.trim(),
+    id, group, category, title: $('edTitle').value.trim() || (group && id.startsWith(group + '-') ? id.slice(group.length + 1) : id), desc: $('edDesc').value.trim(),
     boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves, targets: ed.targets
   }, 0);
   if (cand.error) return toast(cand.error);
@@ -1150,7 +1169,7 @@ function saveEditor() {
   touch(p);
   saveDeck();
   toast(`已儲存「${p.title}」`);
-  S.filter = category;
+  S.group = group || UNGROUPED; S.cat = category;
   startProblem(p.id);
   switchTab('play');
 }
@@ -1175,7 +1194,7 @@ function renderLib() {
       <canvas data-act="play"></canvas>
       <div class="info" data-act="play">
         <div class="t">${esc(p.title)}</div>
-        <div class="m"><span class="chip">${esc(p.category)}</span><span>${esc(p.id)}</span>
+        <div class="m"><span class="chip">${esc(catLabel(p))}</span><span>${esc(p.title !== p.id ? p.id : '')}</span>
           <span class="dots">${Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('')}</span>
           ${issue ? `<span class="chip warn" title="${esc(issue)}">資料有誤</span>` : ''}</div>
       </div>
@@ -1223,7 +1242,7 @@ function runImport(text) {
   const mode = document.querySelector('input[name=importMode]:checked').value;
   if (mode === 'replace' && !confirm(`要用這 ${ok.length} 題取代目前整個題庫（${deck.length} 題）嗎？目前的題目與紀錄會被刪除。`)) return;
 
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, migrated = 0;
   if (mode === 'replace') {
     const keep = new Set(ok.map(p => p.id));
     deck.filter(p => !keep.has(p.id)).forEach(p => markDeleted(p.id));
@@ -1233,7 +1252,12 @@ function runImport(text) {
   ok.forEach(p => {
     if (seen.has(p.id)) { errors.push(`${p.id}：檔案裡題號重複，只保留第一題`); return; }
     seen.add(p.id);
-    const old = findProblem(p.id);
+    let old = findProblem(p.id);
+    if (!old && p.group) {
+      // 以前匯入時還沒有大類（題號是「死活-1」），現在變成「階三-死活-1」：沿用進度並取代舊的那題
+      const legacy = deck.find(q => !q.group && q.category === p.category && q.id === p.title);
+      if (legacy) { old = legacy; markDeleted(legacy.id); migrated++; }
+    }
     if (old) {
       if (!p.history.length) { p.level = old.level; p.streak = old.streak; p.penalty = old.penalty; p.history = old.history; }
       deck[deck.indexOf(old)] = p; updated++;
@@ -1242,18 +1266,19 @@ function runImport(text) {
   });
   saveDeck();
   const warn = ok.filter(p => problemIssue(p));
-  S.filter = 'ALL';
+  S.group = 'ALL'; S.cat = 'ALL';
   if (!findProblem(S.current)) S.current = deck[0].id;
   startProblem();
   renderLib();
   out.innerHTML = `<b style="color:var(--good)">匯入完成：新增 ${added} 題、更新 ${updated} 題</b>` +
+    (migrated ? `<div style="margin-top:6px">其中 ${migrated} 題是舊版沒有大類的同一題，已改用新題號並保留作答進度。</div>` : '') +
     (warn.length ? `<div style="margin-top:6px">其中 ${warn.length} 題的正解無法照規則下完，已標示「資料有誤」：</div><ul>${warn.map(p => `<li>${esc(p.id)}：${esc(problemIssue(p))}</li>`).join('')}</ul>` : '') +
     (errors.length ? `<div style="margin-top:6px">略過 ${errors.length} 筆：</div><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
   $('importText').value = '';
 }
 function exportDeck() {
   const data = deck.map(p => ({
-    id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
+    id: p.id, group: p.group, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
     initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
     level: p.level, streak: p.streak, penalty: p.penalty,
     history: p.history.filter(h => h.moves)
@@ -1315,7 +1340,7 @@ function scheduleSync(delay = 1500) {
 }
 function serializeProblem(p) {
   return {
-    id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
+    id: p.id, group: p.group, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
     initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
     level: p.level, streak: p.streak, penalty: p.penalty, updatedAt: p.updatedAt,
     history: p.history.filter(h => h.moves)   // 舊版的圖片縮圖不上傳
@@ -1493,8 +1518,10 @@ $('btnHint').onclick = showHint;
 $('btnUndo').onclick = undoFree;
 $('btnCheck').onclick = checkFree;
 $('btnNext').onclick = nextProblem;
-$('playFilter').onchange = e => onFilterChange(e.target.value);
-$('libFilter').onchange = e => onFilterChange(e.target.value);
+$('playGroup').onchange = e => onFilterChange('group', e.target.value);
+$('libGroup').onchange = e => onFilterChange('group', e.target.value);
+$('playCat').onchange = e => onFilterChange('cat', e.target.value);
+$('libCat').onchange = e => onFilterChange('cat', e.target.value);
 $('btnClearHist').onclick = () => {
   const p = curProblem();
   if (p.history.length && confirm(`清除「${p.title}」的所有作答紀錄？`)) { p.history = []; touch(p); saveDeck(); renderHistory(); }
@@ -1508,7 +1535,9 @@ $('btnEdUndo').onclick = () => { ed.moves.pop(); renderEditor(); };
 $('btnEdClear').onclick = () => { if (confirm('清空盤面上的所有棋子與手順？')) { ed.black = []; ed.white = []; ed.moves = []; ed.targets = []; renderEditor(); } };
 $('btnEdNew').onclick = () => newEditor();
 $('btnEdSave').onclick = saveEditor;
-$('edCat').addEventListener('change', () => { if (!ed.origId) $('edId').value = suggestId($('edCat').value.trim()); });
+const refreshId = () => { if (!ed.origId) $('edId').value = suggestId($('edGroup').value, $('edCat').value); };
+$('edCat').addEventListener('change', refreshId);
+$('edGroup').addEventListener('change', refreshId);
 
 $('libList').addEventListener('click', onLibClick);
 $('libSearch').addEventListener('input', renderLib);
