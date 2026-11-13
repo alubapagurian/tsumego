@@ -11,7 +11,7 @@ samples/quiz.json            範例題庫（可在「題庫 → 匯入」使用�
 ```
 
 - 資料表會在第一次呼叫 API 時自動建立，不需要手動執行 SQL。
-- 直接用瀏覽器開 `public/index.html`，或放在沒有 API 的主機（例如 GitHub Pages）上也能用，只是資料只存在本機（右上角不會出現同步狀態）。
+- 直接用瀏覽器開 `public/index.html`，或放在沒有 API 的主機（例如 GitHub Pages）上也能用，只是資料只存在本機（左上角不會出現同步狀態）。
 
 ## 部署到 Cloudflare（免費方案）
 
@@ -32,31 +32,24 @@ samples/quiz.json            範例題庫（可在「題庫 → 匯入」使用�
    - Variable name：`DB`
    - D1 database：`tsumego`
 
-### 3. 用 Cloudflare Access 保護網站（只有你能登入）
+### 3. 設定同步密碼
 沒有這一步，API 會拒絕所有同步請求（網頁仍可在本機使用）。
 
-1. 後台 → **Zero Trust** → **Access** → **Applications** → **Add an application** → **Self-hosted**。
-2. Application domain 填 `tsumego.pages.dev`（換成你的實際網址）。想保護預覽版本，可再加一筆 `*.tsumego.pages.dev`。
-3. Session duration 建議設長一點（例如 1 個月），iPad 上就不用常常重新登入。
-4. Policy：Action 選 **Allow**，Include → **Emails** → 填你的 email。登入方式用預設的 **One-time PIN**（寄驗證碼到信箱）即可。
-5. 儲存後，在這個應用程式的設定頁複製 **Application Audience (AUD) Tag**。
-6. 在 Zero Trust → **Settings** 找到你的 team domain，格式是 `https://<團隊名稱>.cloudflareaccess.com`。
+1. 先準備一組**至少 12 個字元**、不容易猜到的密碼，例如用密碼管理工具產生。
+2. Pages 專案 → **Settings** → **Variables and Secrets** → **Add**：
+   - Type：**Secret**（存好後連你自己在後台也看不到內容，請另外記下來）
+   - Variable name：`SYNC_PASSWORD`
+   - Value：剛才的密碼
 
-### 4. 設定環境變數
-Pages 專案 → **Settings** → **Variables and Secrets**（Production）新增：
-
-| 名稱 | 值 |
-|---|---|
-| `CF_ACCESS_TEAM_DOMAIN` | `https://<團隊名稱>.cloudflareaccess.com` |
-| `CF_ACCESS_AUD` | 上一步複製的 AUD Tag |
-
-### 5. 重新部署
+### 4. 重新部署
 綁定和變數只會套用到新的部署：Pages 專案 → **Deployments** → 最新一筆 → **Retry deployment**（或 push 任何變更）。
 
-### 6. 在 iPad 上使用
-1. 用 Safari 開網站，輸入 email 收驗證碼登入。
-2. 左上角出現綠點「已同步」就完成了。
+### 5. 在 iPad 上使用
+1. 用 Safari 開網站，會跳出「雲端同步密碼」視窗，輸入密碼後按「連線」。
+2. 左上角出現綠點「已同步」就完成了。每台裝置只需要輸入一次。
 3. 分享 → **加入主畫面**。
+
+> 密碼存在該裝置的瀏覽器裡。不要在別人的裝置上輸入；若曾經在公用裝置上輸入，可點左上角同步狀態 →「清除密碼」，並到 Cloudflare 更換 `SYNC_PASSWORD`。
 
 同步狀態說明：
 
@@ -65,8 +58,8 @@ Pages 專案 → **Settings** → **Variables and Secrets**（Production）新�
 | 已同步 | 本機和雲端一致 |
 | 同步中… | 正在上傳／下載 |
 | 離線・稍後同步 | 沒有網路；變更已存在本機，連線後自動上傳 |
-| 需要登入 | Access 登入過期，點一下會重新整理頁面登入。若從主畫面圖示開啟一直登入失敗，改用 Safari 開啟登入一次即可 |
-| 伺服器未設定 | 還沒完成第 3、4 步 |
+| 輸入同步密碼 | 還沒輸入密碼，或密碼不正確（例如後台換過密碼），點一下重新輸入 |
+| 伺服器未設定 | 還沒完成第 3、4 步，或密碼少於 12 個字元 |
 
 ## 同步規則
 - 每一題獨立同步，以最後修改時間較新的一方為準。

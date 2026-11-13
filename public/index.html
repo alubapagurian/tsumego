@@ -358,6 +358,25 @@
   </div>
 </div>
 
+<!-- 同步密碼 -->
+<div class="modal" id="pwModal">
+  <div class="box">
+    <h2>雲端同步密碼</h2>
+    <p class="hint-text" style="margin-top:0">輸入在 Cloudflare 設定的 SYNC_PASSWORD。每台裝置只需輸入一次，密碼會存在這台裝置的瀏覽器裡。</p>
+    <form id="pwForm" autocomplete="on">
+      <input type="text" name="username" value="tsumego" autocomplete="username" class="hidden" readonly>
+      <input type="password" id="pwInput" autocomplete="current-password" placeholder="同步密碼"
+             style="min-height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;width:100%;font-size:16px">
+      <div class="import-result" id="pwMsg"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button type="button" class="btn danger" id="btnPwForget">清除密碼</button>
+        <button type="button" class="btn" id="btnPwCancel">取消</button>
+        <button type="submit" class="btn primary">連線</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- 紀錄檢視 -->
 <div class="modal" id="reviewModal">
   <div class="box review">
@@ -1145,7 +1164,7 @@ function onLibClick(e) {
 function runImport(text) {
   const out = $('importResult');
   let data;
-  try { data = JSON.parse(text.replace(/^﻿/, '')); }
+  try { data = JSON.parse(text.replace(/^\uFEFF/, '')); }
   catch (err) { out.innerHTML = `<b style="color:var(--bad)">JSON 格式錯誤：</b>${esc(err.message)}`; return; }
   if (data && !Array.isArray(data)) data = Array.isArray(data.problems) ? data.problems : [data];
   if (!Array.isArray(data) || !data.length) { out.innerHTML = '<b style="color:var(--bad)">找不到任何題目</b>'; return; }
@@ -1216,6 +1235,9 @@ function exportDeck() {
    - 用檔案直接開啟（file://）或找不到 /api 時，只用本機儲存
    ========================================================= */
 const PENDING_KEY = 'tsumego_pending_v1';
+const PW_KEY = 'tsumego_sync_password';
+const getPw = () => { try { return localStorage.getItem(PW_KEY) || ''; } catch (e) { return ''; } };
+const setPw = v => { try { v ? localStorage.setItem(PW_KEY, v) : localStorage.removeItem(PW_KEY); } catch (e) {} };
 const SYNC_CHUNK = 60;
 let pending = (() => {
   try { const v = JSON.parse(localStorage.getItem(PENDING_KEY)); if (v && v.up && v.del) return v; } catch (e) {}
@@ -1257,7 +1279,7 @@ async function api(method, path, body) {
   try {
     res = await fetch('/api/' + path, {
       method, credentials: 'same-origin', redirect: 'manual', cache: 'no-store',
-      headers: body ? { 'Content-Type': 'application/json' } : {},
+      headers: Object.assign(body ? { 'Content-Type': 'application/json' } : {}, getPw() ? { Authorization: 'Bearer ' + getPw() } : {}),
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch (e) { throw { kind: 'offline' }; }
@@ -1265,7 +1287,7 @@ async function api(method, path, body) {
   if (res.status === 404 || res.status === 405) throw { kind: 'local' };
   let data = null;
   try { data = await res.json(); } catch (e) { throw { kind: 'local' }; }   // 不是 API（例如純靜態主機）
-  if (res.status === 401) throw { kind: data?.error === 'not_configured' ? 'setup' : 'login', message: data?.message };
+  if (res.status === 401) throw { kind: data?.error === 'not_configured' ? 'setup' : 'login', code: data?.error, message: data?.message };
   if (!res.ok) throw { kind: 'error', message: data?.message || ('HTTP ' + res.status) };
   return data;
 }
@@ -1298,6 +1320,10 @@ async function runSync() {
     setSyncState(Object.keys(pending.up).length || Object.keys(pending.del).length ? 'busy' : 'ok');
   } catch (e) {
     setSyncState(e.kind || 'error', e.message);
+    if (e.kind === 'login') {
+      if ($('pwModal').classList.contains('open')) $('pwMsg').innerHTML = `<b style="color:var(--bad)">${esc(e.message || '密碼不正確')}</b>`;
+      else if (!sync.askedPw) { sync.askedPw = true; openPw(); }
+    }
   } finally {
     sync.busy = false;
     if (sync.again || (sync.state === 'busy')) { sync.again = false; scheduleSync(300); }
@@ -1351,7 +1377,7 @@ function mergeServer(rows) {
 }
 const SYNC_TEXT = {
   idle: ['', '同步'], busy: ['busy', '同步中…'], ok: ['ok', '已同步'],
-  offline: ['warn', '離線・稍後同步'], login: ['bad', '需要登入'], setup: ['bad', '伺服器未設定'],
+  offline: ['warn', '離線・稍後同步'], login: ['bad', '輸入同步密碼'], setup: ['bad', '伺服器未設定'],
   error: ['bad', '同步失敗'], local: ['', '僅本機'],
 };
 function setSyncState(state, message) {
@@ -1364,8 +1390,27 @@ function setSyncState(state, message) {
   b.querySelector('span').textContent = text;
   b.title = message || text;
 }
+function openPw() {
+  $('pwInput').value = getPw();
+  $('pwMsg').innerHTML = '';
+  $('pwModal').classList.add('open');
+  setTimeout(() => $('pwInput').focus(), 50);
+}
+$('pwForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('pwInput').value.trim();
+  if (!v) { $('pwMsg').innerHTML = '<b style="color:var(--bad)">請輸入密碼</b>'; return; }
+  setPw(v);
+  $('pwMsg').textContent = '連線中…';
+  runSync().then(() => { if (sync.state === 'ok' || sync.state === 'busy') { $('pwModal').classList.remove('open'); toast('已連上雲端'); } });
+});
+$('btnPwCancel').onclick = () => $('pwModal').classList.remove('open');
+$('btnPwForget').onclick = () => {
+  if (!confirm('清除這台裝置上的同步密碼？之後只會存在本機，直到重新輸入密碼。')) return;
+  setPw(''); $('pwModal').classList.remove('open'); setSyncState('login', '請輸入同步密碼');
+};
 $('syncBtn').onclick = () => {
-  if (sync.state === 'login') { location.reload(); return; }
+  if (sync.state === 'login' || sync.state === 'ok') { openPw(); return; }
   if (sync.state === 'setup' || sync.state === 'error') toast($('syncBtn').title);
   runSync();
 };

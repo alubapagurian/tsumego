@@ -8,9 +8,8 @@
  *
  * 需要的設定（Pages 專案 → Settings）：
  *   Bindings：D1 database，名稱 DB
- *   Variables：CF_ACCESS_TEAM_DOMAIN（例：https://myteam.cloudflareaccess.com）
- *              CF_ACCESS_AUD（Access 應用程式的 Application Audience (AUD) Tag）
- *   測試用（不建議）：ALLOW_PUBLIC = true 可跳過登入檢查
+ *   Variables and Secrets：SYNC_PASSWORD（類型選 Secret，至少 12 個字元）
+ *   測試用（不建議）：ALLOW_PUBLIC = true 可跳過密碼檢查
  */
 
 const SCHEMA = `CREATE TABLE IF NOT EXISTS problems (
@@ -30,7 +29,7 @@ export async function onRequest({ request, env, params }) {
     if (!env.DB) return json({ error: 'no_db', message: '尚未在 Pages 設定中綁定名稱為 DB 的 D1 資料庫' }, 500);
     await ensureSchema(env.DB);
 
-    if (path === 'health' && request.method === 'GET') return json({ ok: true, user: user.email });
+    if (path === 'health' && request.method === 'GET') return json({ ok: true });
     if (path === 'deck' && request.method === 'GET') return json({ problems: await readDeck(env.DB) });
     if (path === 'sync' && request.method === 'POST') return json(await sync(env.DB, await request.json()));
     return json({ error: 'not_found' }, 404);
@@ -87,59 +86,27 @@ const cleanId = v => (typeof v === 'string' && v.length > 0 && v.length <= 120 ?
 const cleanTs = v => (Number.isFinite(v) && v > 0 ? Math.floor(v) : null);
 function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
 
-/* ---------------- 登入檢查（Cloudflare Access JWT） ---------------- */
-let certCache = { url: '', keys: [], at: 0 };
-
+/* ---------------- 登入檢查（同步密碼） ----------------
+ * 前端以 Authorization: Bearer <密碼> 傳送；伺服器比對環境變數 SYNC_PASSWORD。
+ * 比對前先各自做 SHA-256，避免以回應時間推測密碼。 */
 async function authenticate(request, env) {
-  const team = (env.CF_ACCESS_TEAM_DOMAIN || '').replace(/\/+$/, '');
-  const aud = env.CF_ACCESS_AUD || '';
-  if (!team || !aud) {
+  const secret = env.SYNC_PASSWORD || '';
+  if (!secret) {
     if (String(env.ALLOW_PUBLIC).toLowerCase() === 'true') return { ok: true, email: null };
-    return { ok: false, error: 'not_configured', message: '伺服器尚未設定 Cloudflare Access（CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD）' };
+    return { ok: false, error: 'not_configured', message: '伺服器尚未設定同步密碼（SYNC_PASSWORD）' };
   }
-  const token = request.headers.get('Cf-Access-Jwt-Assertion') || readCookie(request, 'CF_Authorization');
-  if (!token) return { ok: false, error: 'login_required', message: '請先登入' };
-
-  try {
-    const [h64, p64, s64] = token.split('.');
-    const header = JSON.parse(b64urlText(h64));
-    const payload = JSON.parse(b64urlText(p64));
-    const now = Math.floor(Date.now() / 1000);
-    const auds = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-    if (!auds.includes(aud)) throw new Error('aud');
-    if (payload.iss !== team) throw new Error('iss');
-    if (!payload.exp || payload.exp < now) throw new Error('exp');
-
-    const keys = await getCerts(team);
-    const jwk = keys.find(k => k.kid === header.kid);
-    if (!jwk) throw new Error('kid');
-    const key = await crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-    const valid = await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, b64urlBytes(s64), new TextEncoder().encode(`${h64}.${p64}`));
-    if (!valid) throw new Error('sig');
-    return { ok: true, email: payload.email || null };
-  } catch (e) {
-    return { ok: false, error: 'login_required', message: '登入已失效，請重新整理頁面登入' };
-  }
+  if (secret.length < 12) return { ok: false, error: 'not_configured', message: 'SYNC_PASSWORD 太短，請至少 12 個字元' };
+  const m = (request.headers.get('Authorization') || '').match(/^Bearer\s+(.+)$/);
+  if (!m) return { ok: false, error: 'password_required', message: '請輸入同步密碼' };
+  const [x, y] = await Promise.all([sha256(m[1].trim()), sha256(secret)]);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  if (diff !== 0) return { ok: false, error: 'bad_password', message: '同步密碼不正確' };
+  return { ok: true, email: null };
 }
-
-async function getCerts(team) {
-  const url = `${team}/cdn-cgi/access/certs`;
-  if (certCache.url === url && Date.now() - certCache.at < 3600_000) return certCache.keys;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('certs');
-  const { keys } = await res.json();
-  certCache = { url, keys: keys || [], at: Date.now() };
-  return certCache.keys;
+async function sha256(text) {
+  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)));
 }
-function readCookie(request, name) {
-  const m = (request.headers.get('Cookie') || '').match(new RegExp('(?:^|;\\s*)' + name + '=([^;]+)'));
-  return m ? m[1] : null;
-}
-function b64urlBytes(s) {
-  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4));
-  return Uint8Array.from(bin, c => c.charCodeAt(0));
-}
-const b64urlText = s => new TextDecoder().decode(b64urlBytes(s));
 
 function json(obj, status = 200) {
   return new Response(JSON.stringify(obj), {
