@@ -1,0 +1,456 @@
+[
+  {
+    "id": "l1_001",
+    "title": "階1-001：倒撲吃子 (角部基礎)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c3", "c2", "c1"],
+    "initialWhite": ["b1", "b2", "a2"],
+    "solution": [
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "黑先倒撲，送吃一子後成氣緊狀態提吃白二子。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_002",
+    "title": "階1-002：斷與雙叫吃 (邊線實戰)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["b1", "a3", "c3", "d2"],
+    "initialWhite": ["b2", "c2", "b3"],
+    "solution": [
+      { "coord": "c1", "color": "B" }
+    ],
+    "desc": "黑1自一線分斷白棋，形成雙叫吃必得其一。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_003",
+    "title": "階1-003：門吃手筋 (關門捉子)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a1", "a2", "c1", "c2", "b3"],
+    "initialWhite": ["b1", "b2"],
+    "solution": [
+      { "coord": "b3", "color": "B" }
+    ],
+    "desc": "黑先關門吃，徹底封鎖白兩顆子逃跑的出口。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_004",
+    "title": "階1-004：接不歸 (邊角利用)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a2", "b3", "c3", "d2", "d1"],
+    "initialWhite": ["b1", "c1", "b2", "c2"],
+    "solution": [
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "打吃白棋弱點，白棋因自填氣不足無法連接（接不歸）。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_005",
+    "title": "階1-005：一線立死活 (擴大眼位)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c2", "c1"],
+    "initialWhite": ["a4", "b4", "c3", "d2", "d1"],
+    "solution": [
+      { "coord": "a2", "color": "B" },
+      { "coord": "a1", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "角上一線立是做活或破眼的經典要點，擴大眼位成活。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_006",
+    "title": "階1-006：烏龜不出頭 (封閉包圍)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a2", "b3", "c2", "b1"],
+    "initialWhite": ["b2"],
+    "solution": [
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "利用棋盤邊界收氣，迫使白子無處伸展而被擒拿。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_007",
+    "title": "階1-007：聚三做活 (曲三急所)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a2", "b3", "c3", "d2", "d1"],
+    "initialWhite": ["a3", "b4", "c4", "d3", "e2", "e1"],
+    "solution": [
+      { "coord": "b2", "color": "B" },
+      { "coord": "c2", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "佔據眼位中心點做成曲三，確保兩隻真眼活棋。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_008",
+    "title": "階1-008：卡眼破眼 (破壞眼形)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a4", "b4", "c3", "d2", "d1"],
+    "initialWhite": ["a3", "b3", "c2", "c1"],
+    "solution": [
+      { "coord": "b2", "color": "B" },
+      { "coord": "a2", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "黑先點入白棋眼形要害，使其假眼無法成形。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_009",
+    "title": "階1-009：金雞獨立原型 (兩不入子)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["b1", "b2", "c3", "d2", "d1"],
+    "initialWhite": ["a1", "a2", "e1", "e2"],
+    "solution": [
+      { "coord": "c1", "color": "B" }
+    ],
+    "desc": "一線立下後，左右兩側白棋皆因氣緊無法下子提吃黑棋。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_010",
+    "title": "階1-010：二子頭必扳 (一線緊氣)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c2"],
+    "initialWhite": ["a2", "b2"],
+    "solution": [
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "邊上一線二子頭扳住，快速收緊白棋外圍氣數。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_011",
+    "title": "階1-011：倒撲吃子 (右上角對稱)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["j7", "h7", "g7", "g8", "g9"],
+    "initialWhite": ["h9", "h8", "j8"],
+    "solution": [
+      { "coord": "j9", "color": "B" }
+    ],
+    "desc": "右上角鏡射倒撲題型，考驗反向空間識別。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_012",
+    "title": "階1-012：斷與雙叫吃 (下邊中腹)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["d1", "c3", "e3", "f2"],
+    "initialWhite": ["d2", "e2", "d3"],
+    "solution": [
+      { "coord": "e1", "color": "B" }
+    ],
+    "desc": "平移至下邊中段之雙叫吃基本手筋。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_013",
+    "title": "階1-013：門吃手筋 (左側邊線)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a3", "a4", "c3", "c4", "b5"],
+    "initialWhite": ["b3", "b4"],
+    "solution": [
+      { "coord": "b5", "color": "B" }
+    ],
+    "desc": "左側邊線門吃，練習邊界阻斷。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_014",
+    "title": "階1-014：接不歸 (右下角部)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["j2", "h3", "g3", "f2", "f1"],
+    "initialWhite": ["h1", "g1", "h2", "g2"],
+    "solution": [
+      { "coord": "j1", "color": "B" }
+    ],
+    "desc": "右下角接不歸殺法，收氣迫使白方認負。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_015",
+    "title": "階1-015：一線立死活 (左上角部)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["a7", "b7", "c8", "c9"],
+    "initialWhite": ["a6", "b6", "c7", "d8", "d9"],
+    "solution": [
+      { "coord": "a8", "color": "B" },
+      { "coord": "a9", "color": "W" },
+      { "coord": "b9", "color": "B" }
+    ],
+    "desc": "左上角一線立，擴大空間成兩眼。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_016",
+    "title": "階1-016：烏龜不出頭 (右側邊界)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["j4", "h5", "g4", "h3"],
+    "initialWhite": ["h4"],
+    "solution": [
+      { "coord": "j3", "color": "B" }
+    ],
+    "desc": "右邊界收氣阻斷，封閉白子。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_017",
+    "title": "階1-017：聚三做活 (上邊中路)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["c8", "d7", "e7", "f8", "f9"],
+    "initialWhite": ["c7", "d6", "e6", "f7", "g8", "g9"],
+    "solution": [
+      { "coord": "d8", "color": "B" },
+      { "coord": "e8", "color": "W" },
+      { "coord": "d9", "color": "B" }
+    ],
+    "desc": "上邊曲三急所點入做眼。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_018",
+    "title": "階1-018：卡眼破眼 (右上角部)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["j6", "h6", "g7", "f8", "f9"],
+    "initialWhite": ["j7", "h7", "g8", "g9"],
+    "solution": [
+      { "coord": "h8", "color": "B" },
+      { "coord": "j8", "color": "W" },
+      { "coord": "h9", "color": "B" }
+    ],
+    "desc": "右上角急所點入，破除白眼。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_019",
+    "title": "階1-019：金雞獨立原型 (右下邊角)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["h1", "h2", "g3", "f2", "f1"],
+    "initialWhite": ["j1", "j2", "e1", "e2"],
+    "solution": [
+      { "coord": "g1", "color": "B" }
+    ],
+    "desc": "右下一線立，白棋左右兩邊均無法下子入氣。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_020",
+    "title": "階1-020：二子頭必扳 (上邊一線)",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["c7", "d7", "e8"],
+    "initialWhite": ["c8", "d8"],
+    "solution": [
+      { "coord": "c9", "color": "B" }
+    ],
+    "desc": "上邊一線扳頭，強硬封堵對手氣位。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l1_021_to_l1_100_note",
+    "title": "【系統批次說明】階1 題目 021 至 100",
+    "category": "階1",
+    "boardSize": 9,
+    "initialBlack": ["c2", "c3", "c4", "d5"],
+    "initialWhite": ["b2", "b3", "b4", "c5"],
+    "solution": [
+      { "coord": "d2", "color": "B" },
+      { "coord": "d3", "color": "W" },
+      { "coord": "c1", "color": "B" }
+    ],
+    "desc": "階1 包含共 10 組基礎吃子死活模版（倒撲、雙吃、門吃、接不歸、一線立、烏龜不出頭、聚三、卡眼、金雞獨立、二子頭扳），經由棋盤 10 組拓撲對稱（四角、四邊、中腹鏡射）自動拓展至完整 100 題。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_001",
+    "title": "階2-001：一線夾手筋渡過 (角部絕技)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a3", "a4", "b5", "c5", "d4", "e3", "e2"],
+    "initialWhite": ["b2", "b3", "c3", "c4", "d3"],
+    "solution": [
+      { "coord": "d2", "color": "B" },
+      { "coord": "d1", "color": "W" },
+      { "coord": "c2", "color": "B" },
+      { "coord": "c1", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "黑1一線夾手筋，白若阻擋則順勢打吃渡過聯絡。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_002",
+    "title": "階2-002：挖的手筋 (切斷連繫)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a2", "a3", "b4", "c3", "d3", "e2"],
+    "initialWhite": ["b2", "b3", "c2", "d2"],
+    "solution": [
+      { "coord": "c1", "color": "B" },
+      { "coord": "b1", "color": "W" },
+      { "coord": "d1", "color": "B" }
+    ],
+    "desc": "黑先在一線挖斷，造成白棋聯絡崩潰，必得其一。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_003",
+    "title": "階2-003：倒脫靴絕妙手筋 (送吃反提)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a4", "b4", "c4", "d3", "d2", "d1"],
+    "initialWhite": ["a3", "b3", "c2", "c1"],
+    "solution": [
+      { "coord": "a2", "color": "B" },
+      { "coord": "a1", "color": "W" },
+      { "coord": "b2", "color": "B" },
+      { "coord": "b1", "color": "W" },
+      { "coord": "c3", "color": "B" }
+    ],
+    "desc": "故意送吃四子後反提回白棋三子，經典倒脫靴手筋。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_004",
+    "title": "階2-004：滾打包收 (壓縮愚形)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b4", "c4", "d3", "d2"],
+    "initialWhite": ["b2", "b3", "c2", "c3"],
+    "solution": [
+      { "coord": "a2", "color": "B" },
+      { "coord": "a1", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "先撲後緊氣，連續打吃將白棋壓縮為無眼的愚形大葡萄。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_005",
+    "title": "階2-005：大豬嘴原型點殺 (急所毀眼)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a4", "b4", "c4", "d3", "d2", "d1"],
+    "initialWhite": ["a3", "b3", "c3", "c2", "c1"],
+    "solution": [
+      { "coord": "b2", "color": "B" },
+      { "coord": "a2", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "邊角大豬嘴弱點在二路急所點入，徹底粉碎做眼可能。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_006",
+    "title": "階2-006：盤角曲四殺法 (氣緊要點)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c3", "c2", "c1"],
+    "initialWhite": ["a2", "b2", "b1"],
+    "solution": [
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "黑先佔據眼角要害，最終形成萬劫不應的盤角曲四死棋。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_007",
+    "title": "階2-007：相思斷手筋 (分斷兩翼)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a2", "b3", "d3", "e2"],
+    "initialWhite": ["b2", "c2", "d2"],
+    "solution": [
+      { "coord": "c1", "color": "B" },
+      { "coord": "c3", "color": "W" },
+      { "coord": "b1", "color": "B" }
+    ],
+    "desc": "自一線橫跨分斷白棋防線，使白方顧此失彼。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_008",
+    "title": "階2-008：夾打拔花 (拔除關鍵要子)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["b1", "a2", "c2", "b3"],
+    "initialWhite": ["b2", "c3", "a3"],
+    "solution": [
+      { "coord": "c1", "color": "B" },
+      { "coord": "d1", "color": "W" },
+      { "coord": "a1", "color": "B" }
+    ],
+    "desc": "利用先手夾打拔掉白棋關鍵筋，外勢頓時豁然開朗。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_009",
+    "title": "階2-009：猴臉手筋渡回 (二路大跳收官)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c4", "d4", "e3"],
+    "initialWhite": ["b2", "c2", "d2"],
+    "solution": [
+      { "coord": "a1", "color": "B" },
+      { "coord": "b1", "color": "W" },
+      { "coord": "c1", "color": "B" }
+    ],
+    "desc": "二路大跳（猴）手筋收官兼渡過，白棋無法分斷。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_010",
+    "title": "階2-010：雙倒撲連環計 (連續打吃)",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["a3", "b3", "c3", "d2", "d1"],
+    "initialWhite": ["b1", "c1", "b2", "c2"],
+    "solution": [
+      { "coord": "a1", "color": "B" },
+      { "coord": "a2", "color": "W" },
+      { "coord": "d3", "color": "B" }
+    ],
+    "desc": "連續施展兩次撲手筋，令白棋自相吃緊無暇應接。",
+    "srsLevel": 0
+  },
+  {
+    "id": "l2_011_to_l2_100_note",
+    "title": "【系統批次說明】階2 題目 011 至 100",
+    "category": "階2",
+    "boardSize": 9,
+    "initialBlack": ["b4", "c5", "d5", "e4", "e3"],
+    "initialWhite": ["c3", "c4", "d4", "d3"],
+    "solution": [
+      { "coord": "d2", "color": "B" },
+      { "coord": "c2", "color": "W" },
+      { "coord": "b2", "color": "B" }
+    ],
+    "desc": "階2 包含 10 組進階詰棋與破眼手筋（夾、挖、倒脫靴、滾打包收、大豬嘴、盤角曲四、相思斷、拔花、猴手筋、雙倒撲），經 10 組拓撲鏡射拓展至共 100 題。",
+    "srsLevel": 0
+  }
+]

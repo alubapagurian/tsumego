@@ -1,0 +1,1458 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="詰棋練習">
+<meta name="theme-color" content="#f5f2ec">
+<title>詰棋練習</title>
+<style>
+  :root {
+    --bg: #f5f2ec;
+    --surface: #ffffff;
+    --ink: #1f2328;
+    --muted: #6b6f76;
+    --line: #e3ded4;
+    --accent: #22577a;
+    --accent-soft: #e4eef5;
+    --good: #2e7d4f;
+    --good-soft: #e3f3e8;
+    --bad: #c0392b;
+    --bad-soft: #fbe7e4;
+    --warn-soft: #fdf3dc;
+    --wood: #dcb46c;
+    --hdr: 56px;
+    --pad: 16px;
+    --panel: 340px;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+
+  /* ---------- 頂部列 ---------- */
+  .topbar {
+    position: sticky; top: 0; z-index: 10;
+    height: var(--hdr);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 0 var(--pad);
+    background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font-weight: 700; font-size: 18px; white-space: nowrap; }
+  .brand-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .sync {
+    display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px;
+    border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap;
+  }
+  .sync i { width: 8px; height: 8px; border-radius: 50%; background: #b9b2a5; }
+  .sync.ok i { background: var(--good); }
+  .sync.busy i { background: var(--accent); animation: pulse 1s infinite; }
+  .sync.warn i { background: #d59a00; }
+  .sync.bad i { background: var(--bad); }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (max-width: 600px) { .sync span { display: none; } }
+
+  /* ---------- 分段控制 ---------- */
+  .seg {
+    display: inline-flex; background: #ebe6dc; border-radius: 10px; padding: 3px; gap: 2px;
+  }
+  .seg button {
+    border: 0; background: transparent; border-radius: 8px;
+    min-height: 38px; padding: 0 16px; font-weight: 600; color: var(--muted);
+    cursor: pointer; white-space: nowrap;
+  }
+  .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .seg.full { display: flex; width: 100%; }
+  .seg.full button { flex: 1; padding: 0 8px; }
+
+  /* ---------- 按鈕 ---------- */
+  .btn {
+    min-height: 44px; padding: 0 16px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--surface);
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn:active { transform: scale(.98); background: #f2efe8; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:active { background: #1a4560; }
+  .btn.danger { color: var(--bad); }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--accent); padding: 0 8px; }
+  .btn.small { min-height: 36px; padding: 0 12px; font-size: 14px; }
+  .btn:disabled { opacity: .4; pointer-events: none; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-row > .btn { flex: 1; }
+
+  /* ---------- 版面 ----------
+     棋盤為 橫13 × 直8（寬約為高的 1.57 倍）。
+     橫放：左欄＝棋盤＋下方題目說明；右欄＝操作。直放：全部由上往下排。 */
+  .view { display: none; padding: var(--pad); gap: var(--pad); }
+  .view.active { display: grid; }
+  .split {
+    --avail-h: calc(100vh - var(--hdr) - 2 * var(--pad));
+    --avail-h: calc(100dvh - var(--hdr) - 2 * var(--pad));
+    --bw: min(calc(100vw - var(--panel) - 3 * var(--pad)), calc((var(--avail-h) - 200px) * 1.5714));
+    grid-template-columns: var(--bw) minmax(280px, 420px);
+    justify-content: center; align-items: start;
+  }
+  .split > .panel { max-height: var(--avail-h); overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .board-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+  .under-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: stretch; }
+  #view-edit .under-board { grid-template-columns: 1fr; }
+  @media (orientation: portrait), (max-width: 760px) {
+    .split {
+      --bw: min(calc(100vw - 2 * var(--pad)), 960px);
+      grid-template-columns: minmax(0, var(--bw));
+    }
+    .split > .panel { max-height: none; overflow: visible; }
+  }
+  @media (max-width: 600px) { .under-board { grid-template-columns: 1fr; } }
+  .board-wrap { width: var(--bw); height: calc(var(--bw) / 1.5714); min-width: 280px; min-height: 178px; }
+  .board-wrap canvas {
+    width: 100%; height: 100%; display: block; border-radius: 10px;
+    touch-action: none; -webkit-user-select: none; user-select: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15); cursor: pointer;
+  }
+  .panel { display: flex; flex-direction: column; gap: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+  .card h3 { margin: 0 0 10px; font-size: 15px; color: var(--muted); font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+
+  /* ---------- 題目資訊 ---------- */
+  .prob-meta { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); margin-bottom: 2px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
+  .chip.warn { background: var(--warn-soft); color: #8a5a00; }
+  .prob-title { font-size: 19px; font-weight: 700; margin: 0; line-height: 1.35; }
+  .prob-desc { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
+
+  .status { border-radius: var(--radius); padding: 12px 14px; background: var(--accent-soft); }
+  .status b { display: block; font-size: 16px; }
+  .status span { font-size: 14px; color: #3d4248; }
+  .status.good { background: var(--good-soft); } .status.good b { color: var(--good); }
+  .status.bad { background: var(--bad-soft); } .status.bad b { color: var(--bad); }
+  .status.warn { background: var(--warn-soft); }
+
+  .next-row { display: flex; gap: 8px; }
+  .next-row select { flex: 1; min-width: 0; }
+  .next-row .btn { flex: 1.2; }
+
+  select, input[type=text], textarea {
+    min-height: 44px; border: 1px solid var(--line); border-radius: 10px;
+    background: var(--surface); padding: 0 12px; width: 100%;
+  }
+  textarea { padding: 10px 12px; resize: vertical; }
+  label.field { display: block; font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+  label.field > input, label.field > select, label.field > textarea { margin-top: 4px; color: var(--ink); font-size: 16px; }
+  .field-row { display: flex; gap: 10px; }
+  .field-row > * { flex: 1; min-width: 0; }
+
+  .mastery { display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: var(--muted); }
+  .dots { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }
+  .dots i { width: 10px; height: 10px; border-radius: 50%; background: #ddd6c8; display: inline-block; }
+  .dots i.on { background: var(--good); }
+
+  /* ---------- 紀錄清單 ---------- */
+  .hist { display: flex; flex-direction: column; gap: 6px; }
+  .hist-item { display: flex; gap: 10px; align-items: center; padding: 6px; border-radius: 10px; cursor: pointer; }
+  .hist-item:active { background: #f3f0ea; }
+  .hist-item canvas, .hist-item img { width: 72px; height: 46px; object-fit: cover; border-radius: 6px; flex-shrink: 0; }
+  .hist-item .r { font-weight: 600; font-size: 15px; }
+  .hist-item .r.ok { color: var(--good); } .hist-item .r.ng { color: var(--bad); }
+  .hist-item .d { font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 12px 0; }
+
+  /* ---------- 製題 ---------- */
+  .move-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 32px; }
+  .move-chip { font-size: 13px; padding: 3px 8px; border-radius: 6px; background: #f1ede5; }
+  .move-chip.B { background: #2b2b2b; color: #fff; }
+  .move-chip.W { background: #fff; border: 1px solid #ccc; }
+  .hint-text { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+
+  /* ---------- 題庫 ---------- */
+  .lib { max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .lib-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .lib-tools select { width: auto; flex: 0 1 180px; }
+  .lib-tools input { flex: 1 1 160px; width: auto; }
+  .lib-list { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+  .lib-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .lib-item:first-child { border-top: 0; }
+  .lib-item.current { background: #f6f9fb; }
+  .lib-item canvas { width: 84px; height: 54px; border-radius: 6px; flex-shrink: 0; cursor: pointer; }
+  .lib-item .info { flex: 1; min-width: 0; cursor: pointer; }
+  .lib-item .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-item .m { font-size: 13px; color: var(--muted); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .lib-item .acts { display: flex; gap: 4px; }
+  .lib-count { font-size: 14px; color: var(--muted); }
+
+  /* ---------- 對話框 ---------- */
+  .modal { position: fixed; inset: 0; background: rgba(20,20,20,.45); display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
+  .modal.open { display: flex; }
+  .modal .box { background: var(--surface); border-radius: 16px; padding: 20px; width: min(560px, 100%); max-height: 90vh; overflow: auto; }
+  .modal h2 { margin: 0 0 12px; font-size: 19px; }
+  .modal .box.review { width: auto; text-align: center; }
+  .modal .box.review canvas { width: min(80vw, 560px); height: calc(min(80vw, 560px) / 1.5714); border-radius: 8px; display: block; margin: 0 auto 12px; }
+  .radio-row { display: flex; gap: 16px; margin: 10px 0; font-size: 15px; flex-wrap: wrap; }
+  .radio-row label { display: flex; align-items: center; gap: 6px; min-height: 36px; }
+  .radio-row input { width: 20px; height: 20px; }
+  .import-result { margin-top: 12px; font-size: 14px; }
+  .import-result ul { margin: 6px 0 0; padding-left: 20px; color: var(--muted); max-height: 160px; overflow: auto; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%) translateY(20px);
+    background: #2b2f33; color: #fff; padding: 10px 18px; border-radius: 999px; font-size: 15px;
+    opacity: 0; pointer-events: none; transition: all .2s; z-index: 60; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand-row">
+    <div class="brand">詰棋練習</div>
+    <button class="sync hidden" id="syncBtn" title="雲端同步狀態"><i></i><span>同步中…</span></button>
+  </div>
+  <nav class="seg" id="tabs">
+    <button data-tab="play" aria-pressed="true">練習</button>
+    <button data-tab="edit" aria-pressed="false">製題</button>
+    <button data-tab="lib" aria-pressed="false">題庫</button>
+  </nav>
+</header>
+
+<!-- ================= 練習 ================= -->
+<main id="view-play" class="view split active">
+  <div class="board-col">
+    <div class="board-wrap"><canvas id="playBoard"></canvas></div>
+    <div class="under-board">
+      <div class="card prob-card">
+        <div class="prob-meta"><span class="chip" id="pCat"></span><span id="pId"></span><span class="chip warn hidden" id="pWarn">資料有誤</span></div>
+        <h2 class="prob-title" id="pTitle"></h2>
+        <p class="prob-desc" id="pDesc"></p>
+      </div>
+      <div class="status" id="pStatus"><b></b><span></span></div>
+    </div>
+  </div>
+  <aside class="panel">
+
+    <div class="seg full" id="modeSeg">
+      <button data-mode="AUTO" aria-pressed="true">自動應答</button>
+      <button data-mode="FREE" aria-pressed="false">自由擺子</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="btnReset">重來</button>
+      <button class="btn" id="btnHint">提示</button>
+      <button class="btn hidden" id="btnUndo">悔一手</button>
+      <button class="btn hidden" id="btnCheck">對答案</button>
+    </div>
+
+    <div class="next-row">
+      <select id="playFilter" aria-label="出題範圍"></select>
+      <button class="btn primary" id="btnNext">下一題</button>
+    </div>
+
+    <div class="card">
+      <div class="mastery">
+        <span>熟練度<span class="dots" id="pDots"></span></span>
+        <span id="pStreak"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>作答紀錄 <button class="btn ghost small" id="btnClearHist">清除</button></h3>
+      <div class="hist" id="histList"></div>
+    </div>
+  </aside>
+</main>
+
+<!-- ================= 製題 ================= -->
+<main id="view-edit" class="view split">
+  <div class="board-col">
+    <div class="board-wrap"><canvas id="editBoard"></canvas></div>
+    <div class="under-board">
+      <div class="card">
+        <h3>正解手順
+          <span class="seg" id="firstSeg">
+            <button data-first="B" aria-pressed="true">黑先</button>
+            <button data-first="W" aria-pressed="false">白先</button>
+          </span>
+        </h3>
+        <div class="move-list" id="moveList"></div>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn small" id="btnEdUndo">悔一手</button>
+          <button class="btn small danger" id="btnEdClear">清空盤面</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+  <aside class="panel">
+    <div class="card">
+      <h3><span id="edHeading">新增題目</span> <button class="btn ghost small" id="btnEdNew">開新題</button></h3>
+      <div class="seg full" id="toolSeg">
+        <button data-tool="B" aria-pressed="true">● 黑子</button>
+        <button data-tool="W" aria-pressed="false">○ 白子</button>
+        <button data-tool="M" aria-pressed="false">錄手順</button>
+      </div>
+      <p class="hint-text" id="toolHint"></p>
+    </div>
+
+    <div class="card">
+      <h3>題目資訊</h3>
+      <div class="field-row">
+        <label class="field">分類<input type="text" id="edCat" list="catList" placeholder="例如：階1"></label>
+        <label class="field">題號<input type="text" id="edId" placeholder="自動"></label>
+      </div>
+      <label class="field">名稱<input type="text" id="edTitle" placeholder="例如：倒撲吃子"></label>
+      <label class="field">說明 / 提示<textarea id="edDesc" rows="2" placeholder="例如：黑先，注意撲的手筋"></textarea></label>
+      <button class="btn primary" style="width:100%" id="btnEdSave">儲存題目</button>
+    </div>
+    <datalist id="catList"></datalist>
+  </aside>
+</main>
+
+<!-- ================= 題庫 ================= -->
+<main id="view-lib" class="view">
+  <div class="lib">
+    <div class="lib-tools">
+      <select id="libFilter" aria-label="分類"></select>
+      <input type="text" id="libSearch" placeholder="搜尋題號或名稱">
+      <button class="btn" id="btnImport">匯入</button>
+      <button class="btn" id="btnExport">匯出</button>
+      <button class="btn primary" id="btnLibNew">新增題目</button>
+    </div>
+    <div class="lib-count" id="libCount"></div>
+    <div class="lib-list" id="libList"></div>
+  </div>
+</main>
+
+<!-- 匯入對話框 -->
+<div class="modal" id="importModal">
+  <div class="box">
+    <h2>匯入題庫</h2>
+    <button class="btn primary" style="width:100%" id="btnPickFile">選擇 JSON 檔案…</button>
+    <input type="file" id="importFile" class="hidden">
+    <p class="hint-text">或把 JSON 內容貼在下面：</p>
+    <textarea id="importText" rows="5" placeholder='[ { "id": "...", "initialBlack": [...], "initialWhite": [...], "solution": [...] } ]'></textarea>
+    <div class="radio-row">
+      <label><input type="radio" name="importMode" value="merge" checked> 加入題庫（同題號覆蓋）</label>
+      <label><input type="radio" name="importMode" value="replace"> 取代整個題庫</label>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btnImportClose">關閉</button>
+      <button class="btn primary" id="btnImportRun">匯入貼上的內容</button>
+    </div>
+    <div class="import-result" id="importResult"></div>
+  </div>
+</div>
+
+<!-- 紀錄檢視 -->
+<div class="modal" id="reviewModal">
+  <div class="box review">
+    <h2 id="reviewTitle"></h2>
+    <canvas id="reviewBoard"></canvas>
+    <img id="reviewImg" class="hidden" style="width:min(70vmin,420px);border-radius:8px;margin:0 auto 12px;display:block" alt="">
+    <button class="btn" id="btnReviewClose">關閉</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* =========================================================
+   基本設定與座標
+   ========================================================= */
+const LETTERS = 'ABCDEFGHJKLMNOPQRST';     // 跳過 I（圍棋慣例）
+const STORE_KEY = 'go_tsumego_deck_v3';
+const OLD_STORE_KEYS = ['go_tsumego_deck_v2', 'go_tsumego_deck'];
+const SIZES = [9, 13, 19];
+// 所有題目都放在 19 路大棋盤的左下角，只顯示 橫 13（A–N）× 直 8（1–8）
+const BOARD = 19, VIEW_COLS = 13, VIEW_ROWS = 8;
+const VIEW_TOP = BOARD - VIEW_ROWS;            // 可見區域最上面一行的 grid row index
+const inView = (c, r) => c >= 0 && c < VIEW_COLS && r >= VIEW_TOP && r < BOARD;
+const $ = id => document.getElementById(id);
+const other = c => (c === 'B' ? 'W' : 'B');
+const colorName = c => (c === 'B' ? '黑' : '白');
+
+function parseCoord(s, size) {
+  if (typeof s !== 'string') return null;
+  const m = s.trim().toUpperCase().match(/^([A-HJ-T])(\d{1,2})$/);
+  if (!m) return null;
+  const c = LETTERS.indexOf(m[1]), n = +m[2];
+  if (c < 0 || c >= size || n < 1 || n > size) return null;
+  return { c, r: size - n };
+}
+const toCoord = (c, r, size) => LETTERS[c] + (size - r);
+
+/* =========================================================
+   圍棋規則：落子、提子、禁著
+   ========================================================= */
+function neighbors(i, size) {
+  const c = i % size, r = (i - c) / size, out = [];
+  if (c > 0) out.push(i - 1);
+  if (c < size - 1) out.push(i + 1);
+  if (r > 0) out.push(i - size);
+  if (r < size - 1) out.push(i + size);
+  return out;
+}
+function groupAt(grid, size, i) {
+  const color = grid[i], seen = new Set([i]), stack = [i];
+  let libs = 0; const libSeen = new Set();
+  while (stack.length) {
+    const p = stack.pop();
+    for (const n of neighbors(p, size)) {
+      if (grid[n] === color && !seen.has(n)) { seen.add(n); stack.push(n); }
+      else if (!grid[n] && !libSeen.has(n)) { libSeen.add(n); libs++; }
+    }
+  }
+  return { stones: [...seen], libs };
+}
+/** 在 grid 上落子；成功回傳 {ok, captured}，失敗回傳 {ok:false, reason} */
+function applyMove(grid, size, c, r, color) {
+  const i = r * size + c;
+  if (grid[i]) return { ok: false, reason: '此處已有棋子' };
+  grid[i] = color;
+  const captured = [];
+  for (const n of neighbors(i, size)) {
+    if (grid[n] === other(color)) {
+      const g = groupAt(grid, size, n);
+      if (g.libs === 0) g.stones.forEach(s => { grid[s] = null; captured.push(s); });
+    }
+  }
+  if (groupAt(grid, size, i).libs === 0) { grid[i] = null; return { ok: false, reason: '此處是禁著點（無氣）' }; }
+  return { ok: true, captured };
+}
+/** 依題目初始盤面 + 手順，算出目前盤面 */
+function computePosition(p, moves) {
+  const size = p.boardSize, grid = new Array(size * size).fill(null), nums = new Map();
+  p.initialBlack.forEach(s => { const q = parseCoord(s, size); if (q) grid[q.r * size + q.c] = 'B'; });
+  p.initialWhite.forEach(s => { const q = parseCoord(s, size); if (q) grid[q.r * size + q.c] = 'W'; });
+  let illegal = -1, reason = '';
+  for (let k = 0; k < moves.length; k++) {
+    const q = parseCoord(moves[k].coord, size);
+    if (!q) { illegal = k; reason = '座標錯誤'; break; }
+    const res = applyMove(grid, size, q.c, q.r, moves[k].color);
+    if (!res.ok) { illegal = k; reason = res.reason; break; }
+    res.captured.forEach(s => nums.delete(s));
+    nums.set(q.r * size + q.c, k + 1);
+  }
+  return { size, grid, nums, illegal, reason };
+}
+
+/* =========================================================
+   題目資料：統一格式、相容舊格式、驗證
+   統一格式：
+   { id, category, title, desc, boardSize,
+     initialBlack:["C3",...], initialWhite:[...],
+     solution:[{coord:"B2", color:"B", note?}],
+     level, streak, penalty, history:[] }
+   ========================================================= */
+function normalizeProblem(raw, idx) {
+  if (!raw || typeof raw !== 'object') return { error: `第 ${idx + 1} 筆不是題目物件` };
+  const label = raw.id || raw.title || `第 ${idx + 1} 筆`;
+  const black = raw.initialBlack ?? raw.initial?.black ?? raw.black ?? [];
+  const white = raw.initialWhite ?? raw.initial?.white ?? raw.white ?? [];
+  const solRaw = raw.solution ?? raw.moves ?? [];
+  if (!Array.isArray(black) || !Array.isArray(white) || !Array.isArray(solRaw))
+    return { error: `${label}：初始棋子或正解格式不正確` };
+  if (solRaw.length === 0) return { error: `${label}：沒有正解手順` };
+
+  const solCoord = m => (typeof m === 'string' ? m : (m.coord ?? m.move));
+  const all = [...black, ...white, ...solRaw.map(solCoord)].map(String);
+  let size = +raw.boardSize || +raw.size || 0;
+  if (!SIZES.includes(size)) size = SIZES.find(sz => all.every(s => parseCoord(s, sz))) || 19;
+
+  // ---- 轉換到 13×8 視窗（大棋盤左下角）----
+  // 用 x = 欄（0 起算）、y = 路（1 起算，由下往上）
+  const pts = all.map(s => parseCoord(s, size)).filter(Boolean).map(q => ({ x: q.c, y: size - q.r }));
+  if (!pts.length) return { error: `${label}：沒有任何棋子` };
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  let minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+  // 靠右邊線 → 左右鏡射到左邊線；靠上邊線 → 上下鏡射到下邊線（保留邊線的意義）
+  const flipX = maxX === size - 1 && minX > 0 && !(size === BOARD && maxX < VIEW_COLS);
+  const flipY = maxY === size && minY > 1 && !(size === BOARD && maxY <= VIEW_ROWS);
+  const fx = x => (flipX ? size - 1 - x : x), fy = y => (flipY ? size + 1 - y : y);
+  const tx = pts.map(p => fx(p.x)), ty = pts.map(p => fy(p.y));
+  const shiftX = Math.max(0, Math.max(...tx) - (VIEW_COLS - 1));
+  const shiftY = Math.max(0, Math.max(...ty) - VIEW_ROWS);
+  if (Math.min(...tx) - shiftX < 0 || Math.min(...ty) - shiftY < 1)
+    return { error: `${label}：棋形太大，放不進 13×8 的範圍` };
+  const mapCoord = s => {
+    const q = parseCoord(String(s), size);
+    if (!q) return null;
+    const x = fx(q.c) - shiftX, y = fy(size - q.r) - shiftY;
+    if (x < 0 || x >= VIEW_COLS || y < 1 || y > VIEW_ROWS) return null;
+    return LETTERS[x] + y;
+  };
+  const norm = mapCoord;
+  const transformed = flipX || flipY || shiftX || shiftY || size !== BOARD;
+
+  const bad = [];
+  const ib = black.map(s => norm(s) || (bad.push(s), null)).filter(Boolean);
+  const iw = white.map(s => norm(s) || (bad.push(s), null)).filter(Boolean);
+  let firstColor = null;
+  const solution = solRaw.map((m, k) => {
+    const coord = norm(typeof m === 'string' ? m : (m.coord ?? m.move));
+    if (!coord) { bad.push(typeof m === 'string' ? m : (m.coord ?? m.move)); return null; }
+    let color = String((typeof m === 'object' && m.color) || '').toUpperCase()[0];
+    if (color !== 'B' && color !== 'W') color = k === 0 ? 'B' : null;
+    if (k === 0) firstColor = color;
+    const out = { coord, color: color || (k % 2 === 0 ? firstColor : other(firstColor)) };
+    if (typeof m === 'object' && m.note) out.note = String(m.note);
+    return out;
+  }).filter(Boolean);
+  if (bad.length) return { error: `${label}：無法辨識的座標 ${bad.slice(0, 3).join('、')}` };
+  const dup = ib.find(s => iw.includes(s));
+  if (dup) return { error: `${label}：${dup} 同時是黑子與白子` };
+
+  return {
+    problem: {
+      id: String(raw.id ?? `P-${Date.now().toString(36)}-${idx}`),
+      category: String(raw.category || '未分類'),
+      title: String(raw.title || raw.id || '未命名題目'),
+      desc: String(raw.desc ?? raw.description ?? ''),
+      boardSize: BOARD,
+      initialBlack: [...new Set(ib)],
+      initialWhite: [...new Set(iw)],
+      solution,
+      level: clampInt(raw.level ?? raw.srsLevel, 0, 5, 0),
+      streak: clampInt(raw.streak, 0, 9999, 0),
+      penalty: clampInt(raw.penalty, 0, 100, 0),
+      updatedAt: Number.isFinite(+raw.updatedAt) ? +raw.updatedAt : 0,
+      history: Array.isArray(raw.history) ? raw.history.map(h => {
+        h = normalizeHistory(h);
+        if (!h || !h.moves || !transformed) return h;
+        const moves = h.moves.map(m => ({ ...m, coord: norm(m.coord) }));
+        return moves.every(m => m.coord) ? { ...h, moves } : null;
+      }).filter(Boolean) : []
+    }
+  };
+}
+function clampInt(v, lo, hi, d) { v = parseInt(v, 10); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
+function normalizeHistory(h) {
+  if (!h || typeof h !== 'object') return null;
+  if ('ok' in h) return h;
+  // 舊版紀錄（含縮圖）
+  return { t: null, dateText: h.date || '', ok: !!h.isSuccess, text: h.resultText || '', mode: h.modeText || '', thumb: h.thumbnail || null };
+}
+/** 檢查題目是否能照正解下完；回傳錯誤訊息或 null */
+function problemIssue(p) {
+  const pos = computePosition(p, []);
+  for (let i = 0; i < pos.grid.length; i++) {
+    if (pos.grid[i] && groupAt(pos.grid, pos.size, i).libs === 0)
+      return `初始盤面的 ${toCoord(i % pos.size, Math.floor(i / pos.size), pos.size)} 沒有氣`;
+  }
+  const full = computePosition(p, p.solution);
+  if (full.illegal >= 0) return `正解第 ${full.illegal + 1} 手 ${p.solution[full.illegal].coord}：${full.reason}`;
+  return null;
+}
+
+/* =========================================================
+   題庫儲存
+   ========================================================= */
+const DEFAULT_PROBLEMS = [
+  { id: '範例-1', category: '範例', title: '提子', desc: '黑先。白二子只剩一口氣，把它吃掉。',
+    boardSize: 9, initialBlack: ['A2', 'B2', 'C2'], initialWhite: ['A1', 'B1'],
+    solution: [{ coord: 'C1', color: 'B', note: '黑 1 提掉白二子。' }] },
+  { id: '範例-2', category: '範例', title: '點殺直三', desc: '白先殺。黑棋的眼位是一線直三。',
+    boardSize: 9, initialBlack: ['A2', 'B2', 'C2', 'D2', 'D1'], initialWhite: ['A3', 'B3', 'C3', 'D3', 'E2', 'E1'],
+    solution: [{ coord: 'B1', color: 'W', note: '白 1 點在直三中央，黑棋做不出兩隻眼。' }] }
+];
+
+let deckPristine = false;   // true＝這台裝置還沒有任何自己的資料（只有內建範例）
+let deck = loadDeck();
+function loadDeck() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) {}
+  for (const k of OLD_STORE_KEYS) { if (!Array.isArray(raw)) { try { raw = JSON.parse(localStorage.getItem(k)); } catch (e) {} } }
+  if (!Array.isArray(raw) || raw.length === 0) { raw = DEFAULT_PROBLEMS; deckPristine = true; }
+  const out = raw.map((r, i) => normalizeProblem(r, i).problem).filter(Boolean);
+  return out.length ? out : DEFAULT_PROBLEMS.map((r, i) => normalizeProblem(r, i).problem);
+}
+function saveDeck() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(deck)); }
+  catch (e) { toast('儲存空間不足，請匯出備份後清除部分作答紀錄'); }
+}
+const categories = () => [...new Set(deck.map(p => p.category))];
+const findProblem = id => deck.find(p => p.id === id);
+
+/* =========================================================
+   棋盤繪製（練習、製題、縮圖共用）
+   ========================================================= */
+/* 19 路星位中落在可見範圍的：D4、K4 */
+const STARS = [[3, 15], [9, 15]];
+/** 視窗幾何：左、下是邊線（留座標空間），上、右是開放的（線條延伸出去） */
+function geometry(w, h, labels) {
+  const mL = labels ? 1.0 : 0.55, mB = labels ? 1.0 : 0.55, open = 0.65;
+  const cell = Math.min(w / (VIEW_COLS - 1 + mL + open), h / (VIEW_ROWS - 1 + mB + open));
+  const bw = cell * (VIEW_COLS - 1 + mL + open), bh = cell * (VIEW_ROWS - 1 + mB + open);
+  return { cell, mL, mB, open, ox: (w - bw) / 2 + mL * cell, oy: (h - bh) / 2 + open * cell };
+}
+function fitCanvas(cv, cssW, cssH) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(cssW || cv.clientWidth), h = Math.round(cssH || cv.clientHeight);
+  if (!w || !h) return null;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w, h };
+}
+/**
+ * view = { size(19), grid, nums, ghosts:[{i,color,n}], marks:[{i,type}] }
+ * opts = { labels, w, h }
+ */
+function drawBoard(cv, view, opts = {}) {
+  const dim = fitCanvas(cv, opts.w, opts.h);
+  if (!dim) return;
+  const ctx = cv.getContext('2d'), size = view.size, labels = opts.labels !== false;
+  const { cell, ox, oy, open, mB, mL } = geometry(dim.w, dim.h, labels);
+  const xy = i => [ox + (i % size) * cell, oy + (Math.floor(i / size) - VIEW_TOP) * cell];
+  const right = ox + (VIEW_COLS - 1) * cell, bottom = oy + (VIEW_ROWS - 1) * cell;
+
+  ctx.fillStyle = '#dcb46c';
+  ctx.fillRect(0, 0, dim.w, dim.h);
+  ctx.strokeStyle = '#4a3420';
+  ctx.lineWidth = Math.max(0.6, cell / 40);
+  ctx.beginPath();
+  for (let k = 0; k < VIEW_ROWS; k++) { ctx.moveTo(ox, oy + k * cell); ctx.lineTo(right + open * cell, oy + k * cell); }
+  for (let k = 0; k < VIEW_COLS; k++) { ctx.moveTo(ox + k * cell, oy - open * cell); ctx.lineTo(ox + k * cell, bottom); }
+  ctx.stroke();
+  // 邊線（左、下）加粗
+  ctx.lineWidth = Math.max(1.2, cell / 18);
+  ctx.beginPath();
+  ctx.moveTo(ox, oy - open * cell); ctx.lineTo(ox, bottom); ctx.lineTo(right + open * cell, bottom);
+  ctx.stroke();
+  ctx.fillStyle = '#4a3420';
+  STARS.forEach(([c, r]) => { ctx.beginPath(); ctx.arc(ox + c * cell, oy + (r - VIEW_TOP) * cell, Math.max(1.5, cell / 12), 0, 7); ctx.fill(); });
+
+  if (labels) {
+    ctx.fillStyle = '#5b4026';
+    ctx.font = `${Math.round(cell * 0.34)}px -apple-system, sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let k = 0; k < VIEW_COLS; k++) ctx.fillText(LETTERS[k], ox + k * cell, bottom + mB * cell * 0.62);
+    for (let k = 0; k < VIEW_ROWS; k++) ctx.fillText(String(VIEW_ROWS - k), ox - mL * cell * 0.62, oy + k * cell);
+  }
+
+  const stone = (i, color, n, alpha) => {
+    const [x, y] = xy(i), rad = cell * 0.47;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (alpha === 1 && cell > 20) { ctx.shadowColor = 'rgba(0,0,0,.3)'; ctx.shadowBlur = cell / 10; ctx.shadowOffsetY = cell / 30; }
+    const g = ctx.createRadialGradient(x - rad * .35, y - rad * .35, rad * .1, x, y, rad);
+    if (color === 'B') { g.addColorStop(0, '#5a5a5a'); g.addColorStop(1, '#111'); }
+    else { g.addColorStop(0, '#fff'); g.addColorStop(1, '#d6d6d0'); }
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill();
+    ctx.restore();
+    if (n && cell > 14) {
+      ctx.save();
+      ctx.globalAlpha = alpha === 1 ? 1 : 0.7;
+      ctx.fillStyle = color === 'B' ? '#fff' : '#111';
+      ctx.font = `600 ${Math.round(cell * (n > 9 ? 0.4 : 0.48))}px -apple-system, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(n), x, y + cell * 0.02);
+      ctx.restore();
+    }
+  };
+  const visible = i => inView(i % size, Math.floor(i / size));
+  view.grid.forEach((col, i) => { if (col && visible(i)) stone(i, col, view.nums?.get(i), 1); });
+  (view.ghosts || []).forEach(g => { if (!view.grid[g.i] && visible(g.i)) stone(g.i, g.color, g.n, 0.38); });
+
+  (view.marks || []).forEach(m => {
+    if (!visible(m.i)) return;
+    const [x, y] = xy(m.i);
+    ctx.save();
+    ctx.lineWidth = Math.max(2, cell / 12);
+    if (m.type === 'error') { ctx.strokeStyle = '#d93025'; ctx.beginPath(); ctx.arc(x, y, cell * 0.5, 0, 7); ctx.stroke(); }
+    if (m.type === 'correct') {
+      ctx.fillStyle = 'rgba(46,125,79,.25)'; ctx.strokeStyle = '#2e7d4f';
+      ctx.beginPath(); ctx.arc(x, y, cell * 0.42, 0, 7); ctx.fill(); ctx.stroke();
+    }
+    if (m.type === 'hint') {
+      ctx.strokeStyle = '#22577a'; ctx.setLineDash([cell / 8, cell / 10]);
+      ctx.beginPath(); ctx.arc(x, y, cell * 0.42, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+  });
+}
+function hitTest(cv, ev) {
+  const rect = cv.getBoundingClientRect();
+  const { cell, ox, oy } = geometry(rect.width, rect.height, true);
+  const px = ev.clientX - rect.left, py = ev.clientY - rect.top;
+  const c = Math.round((px - ox) / cell), vr = Math.round((py - oy) / cell);
+  if (c < 0 || c >= VIEW_COLS || vr < 0 || vr >= VIEW_ROWS) return null;
+  // 點太遠就不算（避免誤觸棋盤邊緣）
+  if (Math.hypot(px - (ox + c * cell), py - (oy + vr * cell)) > cell * 0.6) return null;
+  return { c, r: vr + VIEW_TOP };
+}
+/** 綁定棋盤點擊：用 pointer 事件，手指拖曳太遠視為取消 */
+function bindBoardTap(cv, handler) {
+  let start = null;
+  cv.addEventListener('pointerdown', e => { start = { x: e.clientX, y: e.clientY }; });
+  cv.addEventListener('pointerup', e => {
+    if (!start) return;
+    const moved = Math.hypot(e.clientX - start.x, e.clientY - start.y);
+    start = null;
+    if (moved < 20) handler(e);
+  });
+  cv.addEventListener('pointercancel', () => { start = null; });
+}
+
+/* =========================================================
+   練習
+   ========================================================= */
+const S = {
+  tab: 'play',
+  mode: 'AUTO',        // AUTO 自動應答 / FREE 自由擺子
+  filter: 'ALL',
+  current: deck[0].id,
+};
+let play = null;
+const curProblem = () => findProblem(S.current) || deck[0];
+
+function newRound() {
+  play = { moves: [], state: 'playing', errorIdx: -1, hint: null, correct: null, usedHint: false, recorded: false, busy: false, timer: null };
+}
+function startProblem(id) {
+  if (play?.timer) clearTimeout(play.timer);
+  if (id) S.current = id;
+  newRound();
+  renderPlay();
+}
+function userColor(p) { return p.solution[0].color; }
+
+function playView() {
+  const p = curProblem();
+  let moves = play.moves, ghosts = [];
+  if (S.mode === 'FREE' && play.errorIdx >= 0) {
+    moves = play.moves.slice(0, play.errorIdx + 1);
+    const pre = computePosition(p, moves);
+    ghosts = play.moves.slice(play.errorIdx + 1).map((m, k) => {
+      const q = parseCoord(m.coord, p.boardSize);
+      return { i: q.r * p.boardSize + q.c, color: m.color, n: play.errorIdx + 2 + k };
+    });
+    return withMarks(pre, ghosts, p);
+  }
+  return withMarks(computePosition(p, moves), ghosts, p);
+}
+function withMarks(pos, ghosts, p) {
+  const size = p.boardSize, marks = [];
+  const idx = s => { const q = parseCoord(s, size); return q.r * size + q.c; };
+  if (play.errorIdx >= 0) marks.push({ i: idx(play.moves[play.errorIdx].coord), type: 'error' });
+  if (play.correct) marks.push({ i: idx(play.correct), type: 'correct' });
+  if (play.hint) marks.push({ i: idx(play.hint), type: 'hint' });
+  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks };
+}
+
+function renderPlay() {
+  const p = curProblem();
+  $('pCat').textContent = p.category;
+  $('pId').textContent = p.id;
+  $('pTitle').textContent = p.title;
+  $('pDesc').textContent = p.desc;
+  $('pDesc').classList.toggle('hidden', !p.desc);
+  const issue = problemIssue(p);
+  $('pWarn').classList.toggle('hidden', !issue);
+  $('pWarn').title = issue || '';
+
+  document.querySelectorAll('#modeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.mode));
+  $('btnUndo').classList.toggle('hidden', S.mode !== 'FREE');
+  $('btnCheck').classList.toggle('hidden', S.mode !== 'FREE');
+  $('btnUndo').disabled = play.state !== 'playing' || play.moves.length === 0;
+  $('btnCheck').disabled = play.state !== 'playing' || play.moves.length === 0;
+  $('btnHint').disabled = play.state !== 'playing';
+
+  renderStatus();
+  renderFilterSelects();
+  renderMastery();
+  renderHistory();
+  drawBoard($('playBoard'), playView());
+}
+
+function renderStatus() {
+  const p = curProblem(), uc = userColor(p), el = $('pStatus');
+  let tone = '', t = '', d = '';
+  const issue = problemIssue(p);
+  if (issue) { tone = 'warn'; t = '這題的資料有問題'; d = issue + '。可到「題庫」按編輯修正。'; }
+  else if (play.msg) { ({ tone, t, d } = play.msg); }
+  else if (S.mode === 'AUTO') { t = `${colorName(uc)}先`; d = `你執${colorName(uc)}，電腦會照正解應對。`; }
+  else {
+    const n = play.moves.length, c = n % 2 === 0 ? uc : other(uc);
+    t = `輪到${colorName(c)}（第 ${n + 1} 手）`; d = '自行擺出雙方手順，擺完按「對答案」。';
+  }
+  el.className = 'status ' + tone;
+  el.querySelector('b').textContent = t;
+  el.querySelector('span').textContent = d;
+}
+function setMsg(tone, t, d) { play.msg = { tone, t, d }; }
+
+function onPlayTap(e) {
+  const p = curProblem();
+  const q = hitTest($('playBoard'), e);
+  if (!q || play.state !== 'playing' || play.busy) return;
+  if (problemIssue(p)) { toast('這題的資料有問題，請先到題庫修正'); return; }
+  const coord = toCoord(q.c, q.r, p.boardSize);
+  const n = play.moves.length;
+  const uc = userColor(p);
+  const color = S.mode === 'AUTO' ? p.solution[n].color : (n % 2 === 0 ? uc : other(uc));
+
+  // 合法性檢查
+  const trial = computePosition(p, [...play.moves, { coord, color }]);
+  if (trial.illegal >= 0) { if (trial.reason !== '此處已有棋子') toast(trial.reason); return; }
+  play.hint = null;
+
+  if (S.mode === 'FREE') {
+    play.moves.push({ coord, color });
+    play.msg = null;
+    renderPlay();
+    return;
+  }
+
+  // 自動應答
+  const expect = p.solution[n];
+  play.moves.push({ coord, color });
+  if (coord !== expect.coord) {
+    play.state = 'fail'; play.errorIdx = n; play.correct = expect.coord;
+    setMsg('bad', '不是正解', `${coord} 不對，綠圈是正確位置。按「重來」再試一次。`);
+    finishRound(false, `第 ${n + 1} 手錯（${coord}）`);
+    renderPlay();
+    return;
+  }
+  setMsg('', '正確！', expect.note || '');
+  autoReply();
+}
+function autoReply() {
+  const p = curProblem();
+  const idx = play.moves.length;
+  if (idx >= p.solution.length) {
+    play.state = 'success';
+    setMsg('good', '正解！', play.usedHint ? '全部手順正確（使用了提示，熟練度不提升）。' : '全部手順正確，做得好！');
+    finishRound(true, play.usedHint ? '正解（看提示）' : '正解');
+    renderPlay();
+    return;
+  }
+  const next = p.solution[idx];
+  if (next.color === userColor(p)) { renderPlay(); return; }
+  play.busy = true;
+  renderPlay();
+  play.timer = setTimeout(() => {
+    play.busy = false;
+    play.moves.push({ coord: next.coord, color: next.color });
+    if (next.note) setMsg('', `${colorName(next.color)}應 ${next.coord}`, next.note);
+    else setMsg('', `${colorName(next.color)}應 ${next.coord}`, `輪到你繼續（第 ${idx + 2} 手）。`);
+    autoReply();
+  }, 350);
+}
+
+function checkFree() {
+  const p = curProblem(), sol = p.solution, mv = play.moves;
+  let err = -1;
+  for (let i = 0; i < mv.length; i++) {
+    if (i >= sol.length || mv[i].coord !== sol[i].coord || mv[i].color !== sol[i].color) { err = i; break; }
+  }
+  if (err === -1 && mv.length >= sol.length) {
+    play.state = 'success';
+    setMsg('good', '正解！', play.usedHint ? '全部手順正確（使用了提示，熟練度不提升）。' : '全部手順正確，做得好！');
+    finishRound(true, play.usedHint ? '正解（看提示）' : '正解');
+  } else if (err === -1) {
+    setMsg('warn', '目前都正確', `已完成 ${mv.length} / ${sol.length} 手，請繼續往下擺。`);
+  } else {
+    play.state = 'fail'; play.errorIdx = err;
+    play.correct = err < sol.length ? sol[err].coord : null;
+    setMsg('bad', `第 ${err + 1} 手錯了`,
+      err < sol.length ? `綠圈是正解位置；之後的手順以淡色保留供檢討。` : `正解只有 ${sol.length} 手，第 ${err + 1} 手之後是多餘的。`);
+    finishRound(false, `第 ${err + 1} 手錯`);
+  }
+  renderPlay();
+}
+function undoFree() {
+  if (play.state !== 'playing' || !play.moves.length) return;
+  play.moves.pop(); play.msg = null; play.hint = null;
+  renderPlay();
+}
+function showHint() {
+  const p = curProblem();
+  if (play.state !== 'playing') return;
+  const idx = play.moves.length;
+  if (idx >= p.solution.length) { toast('已經擺完正解的手數'); return; }
+  play.hint = p.solution[idx].coord;
+  play.usedHint = true;
+  setMsg('', '提示', `第 ${idx + 1} 手：${colorName(p.solution[idx].color)} 下在虛線圈的位置。`);
+  renderPlay();
+}
+
+function finishRound(ok, text) {
+  if (play.recorded) return;
+  play.recorded = true;
+  const p = curProblem();
+  p.history.unshift({ t: Date.now(), ok, hint: play.usedHint, mode: S.mode, text, moves: play.moves.map(m => ({ ...m })), err: play.errorIdx });
+  if (p.history.length > 30) p.history.length = 30;
+  if (ok) {
+    if (!play.usedHint) p.level = Math.min(5, p.level + 1);
+    p.streak += 1; p.penalty = 0;
+  } else {
+    p.level = Math.max(0, p.level - 1); p.streak = 0; p.penalty = 50;
+  }
+  touch(p);
+  saveDeck();
+}
+
+function renderMastery() {
+  const p = curProblem();
+  $('pDots').innerHTML = Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('');
+  $('pStreak').textContent = p.streak ? `連續答對 ${p.streak} 次` : '';
+}
+
+function fmtDate(h) {
+  if (!h.t) return h.dateText || '';
+  const d = new Date(h.t), z = n => String(n).padStart(2, '0');
+  return `${d.getMonth() + 1}/${d.getDate()} ${z(d.getHours())}:${z(d.getMinutes())}`;
+}
+function historyView(p, h) {
+  if (!h.moves) return null;
+  const errIdx = h.mode === 'FREE' ? h.err : -1;
+  const moves = errIdx >= 0 ? h.moves.slice(0, errIdx + 1) : h.moves;
+  const pos = computePosition(p, moves);
+  const size = p.boardSize, idx = s => { const q = parseCoord(s, size); return q ? q.r * size + q.c : -1; };
+  const ghosts = errIdx >= 0 ? h.moves.slice(errIdx + 1).map((m, k) => ({ i: idx(m.coord), color: m.color, n: errIdx + 2 + k })).filter(g => g.i >= 0) : [];
+  const marks = [];
+  if (h.err >= 0 && h.moves[h.err]) marks.push({ i: idx(h.moves[h.err].coord), type: 'error' });
+  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks: marks.filter(m => m.i >= 0) };
+}
+function renderHistory() {
+  const p = curProblem(), box = $('histList');
+  box.innerHTML = '';
+  if (!p.history.length) { box.innerHTML = '<div class="empty">還沒有紀錄，完成一次作答後會出現在這裡。</div>'; return; }
+  p.history.forEach((h, k) => {
+    const row = document.createElement('div');
+    row.className = 'hist-item';
+    let thumb;
+    if (h.moves) { thumb = document.createElement('canvas'); }
+    else if (h.thumb) { thumb = document.createElement('img'); thumb.src = h.thumb; }
+    else thumb = document.createElement('div');
+    row.appendChild(thumb);
+    const info = document.createElement('div');
+    const modeText = h.mode === 'AUTO' ? '自動應答' : h.mode === 'FREE' ? '自由擺子' : h.mode;
+    info.innerHTML = `<div class="r ${h.ok ? 'ok' : 'ng'}">${h.ok ? '✓' : '✗'} ${esc(h.text)}</div><div class="d">${esc(fmtDate(h))}・${esc(modeText)}</div>`;
+    row.appendChild(info);
+    row.onclick = () => openReview(p, h);
+    box.appendChild(row);
+    if (h.moves) { const v = historyView(p, h); if (v) drawBoard(thumb, v, { labels: false, w: 72, h: 46 }); }
+  });
+}
+function openReview(p, h) {
+  $('reviewTitle').textContent = `${h.ok ? '✓' : '✗'} ${h.text}　${fmtDate(h)}`;
+  const v = historyView(p, h);
+  $('reviewBoard').classList.toggle('hidden', !v);
+  $('reviewImg').classList.toggle('hidden', !!v);
+  $('reviewModal').classList.add('open');
+  if (v) drawBoard($('reviewBoard'), v);
+  else $('reviewImg').src = h.thumb || '';
+}
+
+/* ---------- 出題範圍 / 下一題 ---------- */
+const pool = () => (S.filter === 'ALL' ? deck : deck.filter(p => p.category === S.filter));
+function weight(p) { return Math.floor(100 / (1 + 1.5 * p.level)) + p.penalty; }
+function nextProblem() {
+  let list = pool().filter(p => !problemIssue(p));
+  if (!list.length) list = pool();
+  if (list.length > 1) list = list.filter(p => p.id !== S.current);
+  const total = list.reduce((s, p) => s + weight(p), 0);
+  let r = Math.random() * total, pick = list[0];
+  for (const p of list) { r -= weight(p); if (r <= 0) { pick = p; break; } }
+  startProblem(pick.id);
+}
+function renderFilterSelects() {
+  const cats = categories();
+  if (S.filter !== 'ALL' && !cats.includes(S.filter)) S.filter = 'ALL';
+  const html = `<option value="ALL">全部分類（${deck.length}）</option>` +
+    cats.map(c => `<option value="${esc(c)}">${esc(c)}（${deck.filter(p => p.category === c).length}）</option>`).join('');
+  ['playFilter', 'libFilter'].forEach(id => { $(id).innerHTML = html; $(id).value = S.filter; });
+  $('catList').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+}
+function onFilterChange(v) {
+  S.filter = v;
+  const list = pool();
+  if (list.length && !list.some(p => p.id === S.current)) startProblem(list[0].id);
+  else renderPlay();
+  if (S.tab === 'lib') renderLib();
+}
+
+/* =========================================================
+   製題
+   ========================================================= */
+let ed = null;
+function newEditor(fromProblem) {
+  const p = fromProblem;
+  ed = {
+    origId: p ? p.id : null,
+    size: BOARD,
+    black: p ? [...p.initialBlack] : [],
+    white: p ? [...p.initialWhite] : [],
+    moves: p ? p.solution.map(m => ({ ...m })) : [],
+    first: p ? p.solution[0].color : 'B',
+    tool: 'B',
+  };
+  $('edHeading').textContent = p ? `編輯：${p.id}` : '新增題目';
+  $('edCat').value = p ? p.category : (S.filter !== 'ALL' ? S.filter : (categories()[0] || ''));
+  $('edId').value = p ? p.id : suggestId($('edCat').value);
+  $('edTitle').value = p ? p.title : '';
+  $('edDesc').value = p ? p.desc : '';
+  renderEditor();
+}
+function suggestId(cat) {
+  const prefix = (cat || 'P').trim() || 'P';
+  let n = deck.filter(p => p.category === cat).length + 1, id;
+  do { id = `${prefix}-${String(n).padStart(3, '0')}`; n++; } while (findProblem(id));
+  return id;
+}
+const edProblem = () => ({ boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves });
+function renderEditor() {
+  document.querySelectorAll('#toolSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === ed.tool));
+  document.querySelectorAll('#firstSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.first === ed.first));
+  const nextColor = ed.moves.length % 2 === 0 ? ed.first : other(ed.first);
+  $('toolHint').textContent = ed.tool === 'M'
+    ? `在棋盤上依序點出正解。下一手：${colorName(nextColor)} ${ed.moves.length + 1}`
+    : `點棋盤放${ed.tool === 'B' ? '黑' : '白'}子；再點一次同色子可移除。`;
+  $('moveList').innerHTML = ed.moves.length
+    ? ed.moves.map((m, k) => `<span class="move-chip ${m.color}">${k + 1}. ${m.coord}</span>`).join('')
+    : '<span class="hint-text" style="margin:0">尚未錄製。選「錄手順」後在棋盤上點出正解。</span>';
+  $('btnEdUndo').disabled = !ed.moves.length;
+  renderFilterSelects();
+  const pos = computePosition(edProblem(), ed.moves);
+  drawBoard($('editBoard'), { size: ed.size, grid: pos.grid, nums: pos.nums, marks: [] });
+}
+function onEditTap(e) {
+  const q = hitTest($('editBoard'), e);
+  if (!q) return;
+  const coord = toCoord(q.c, q.r, ed.size);
+  if (ed.tool === 'M') {
+    const color = ed.moves.length % 2 === 0 ? ed.first : other(ed.first);
+    const trial = computePosition(edProblem(), [...ed.moves, { coord, color }]);
+    if (trial.illegal >= 0) { toast(trial.reason); return; }
+    ed.moves.push({ coord, color });
+  } else {
+    const mine = ed.tool === 'B' ? ed.black : ed.white, theirs = ed.tool === 'B' ? ed.white : ed.black;
+    if (mine.includes(coord)) mine.splice(mine.indexOf(coord), 1);
+    else { if (theirs.includes(coord)) theirs.splice(theirs.indexOf(coord), 1); mine.push(coord); }
+    if (ed.moves.length && computePosition(edProblem(), ed.moves).illegal >= 0) toast('注意：盤面改變後，已錄的手順有衝突');
+  }
+  renderEditor();
+}
+function setFirst(c) {
+  ed.first = c;
+  ed.moves.forEach((m, k) => { m.color = k % 2 === 0 ? c : other(c); });
+  renderEditor();
+}
+function saveEditor() {
+  const id = $('edId').value.trim() || suggestId($('edCat').value);
+  const category = $('edCat').value.trim() || '未分類';
+  if (!ed.black.length && !ed.white.length) return toast('請先在棋盤上擺出題目的棋子');
+  if (!ed.moves.length) return toast('請至少錄製 1 手正解');
+  const cand = normalizeProblem({
+    id, category, title: $('edTitle').value.trim() || id, desc: $('edDesc').value.trim(),
+    boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves
+  }, 0);
+  if (cand.error) return toast(cand.error);
+  const p = cand.problem, issue = problemIssue(p);
+  if (issue) return toast(issue);
+
+  const existing = findProblem(id);
+  if (existing && id !== ed.origId && !confirm(`題號「${id}」已存在，要覆蓋它嗎？`)) return;
+  const base = findProblem(ed.origId) || existing;
+  if (base) {
+    const samePos = JSON.stringify([base.boardSize, base.initialBlack, base.initialWhite, base.solution]) ===
+                    JSON.stringify([p.boardSize, p.initialBlack, p.initialWhite, p.solution]);
+    p.level = base.level; p.streak = base.streak; p.penalty = base.penalty;
+    p.history = samePos ? base.history : [];
+    deck = deck.filter(x => x !== base && x.id !== id);
+    if (base.id !== p.id) markDeleted(base.id);
+  }
+  deck.push(p);
+  touch(p);
+  saveDeck();
+  toast(`已儲存「${p.title}」`);
+  S.filter = category;
+  startProblem(p.id);
+  switchTab('play');
+}
+
+/* =========================================================
+   題庫
+   ========================================================= */
+function renderLib() {
+  renderFilterSelects();
+  const q = $('libSearch').value.trim().toLowerCase();
+  const list = pool().filter(p => !q || p.id.toLowerCase().includes(q) || p.title.toLowerCase().includes(q));
+  $('libCount').textContent = `共 ${list.length} 題` + (list.length !== deck.length ? `（題庫總數 ${deck.length}）` : '');
+  const box = $('libList');
+  box.innerHTML = '';
+  if (!list.length) { box.innerHTML = '<div class="empty" style="padding:24px">沒有符合的題目</div>'; return; }
+  const frag = document.createDocumentFragment(), draws = [];
+  list.forEach(p => {
+    const issue = problemIssue(p);
+    const row = document.createElement('div');
+    row.className = 'lib-item' + (p.id === S.current ? ' current' : '');
+    row.innerHTML = `
+      <canvas data-act="play"></canvas>
+      <div class="info" data-act="play">
+        <div class="t">${esc(p.title)}</div>
+        <div class="m"><span class="chip">${esc(p.category)}</span><span>${esc(p.id)}</span>
+          <span class="dots">${Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('')}</span>
+          ${issue ? `<span class="chip warn" title="${esc(issue)}">資料有誤</span>` : ''}</div>
+      </div>
+      <div class="acts">
+        <button class="btn small" data-act="edit">編輯</button>
+        <button class="btn small danger" data-act="del">刪除</button>
+      </div>`;
+    row.dataset.id = p.id;
+    frag.appendChild(row);
+    draws.push([row.querySelector('canvas'), { ...computePosition(p, []), marks: [] }]);
+  });
+  box.appendChild(frag);
+  draws.forEach(([cv, v]) => drawBoard(cv, v, { labels: false, w: 84, h: 54 }));
+}
+function onLibClick(e) {
+  const t = e.target.closest('[data-act]'); if (!t) return;
+  const id = t.closest('.lib-item').dataset.id, p = findProblem(id);
+  if (!p) return;
+  if (t.dataset.act === 'play') { startProblem(id); switchTab('play'); }
+  if (t.dataset.act === 'edit') { newEditor(p); switchTab('edit'); }
+  if (t.dataset.act === 'del') {
+    if (deck.length <= 1) return toast('題庫至少要保留一題');
+    if (!confirm(`刪除「${p.title}」（${p.id}）？作答紀錄也會一起刪除。`)) return;
+    deck = deck.filter(x => x !== p);
+    markDeleted(id);
+    saveDeck();
+    if (S.current === id) startProblem(deck[0].id);
+    renderLib();
+  }
+}
+
+/* ---------- 匯入 / 匯出 ---------- */
+function runImport(text) {
+  const out = $('importResult');
+  let data;
+  try { data = JSON.parse(text.replace(/^﻿/, '')); }
+  catch (err) { out.innerHTML = `<b style="color:var(--bad)">JSON 格式錯誤：</b>${esc(err.message)}`; return; }
+  if (data && !Array.isArray(data)) data = Array.isArray(data.problems) ? data.problems : [data];
+  if (!Array.isArray(data) || !data.length) { out.innerHTML = '<b style="color:var(--bad)">找不到任何題目</b>'; return; }
+
+  const ok = [], errors = [];
+  data.forEach((raw, i) => { const r = normalizeProblem(raw, i); r.error ? errors.push(r.error) : ok.push(r.problem); });
+  if (!ok.length) { out.innerHTML = `<b style="color:var(--bad)">沒有可匯入的題目</b><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; return; }
+
+  const mode = document.querySelector('input[name=importMode]:checked').value;
+  if (mode === 'replace' && !confirm(`要用這 ${ok.length} 題取代目前整個題庫（${deck.length} 題）嗎？目前的題目與紀錄會被刪除。`)) return;
+
+  let added = 0, updated = 0;
+  if (mode === 'replace') {
+    const keep = new Set(ok.map(p => p.id));
+    deck.filter(p => !keep.has(p.id)).forEach(p => markDeleted(p.id));
+    deck = [];
+  }
+  const seen = new Set();
+  ok.forEach(p => {
+    if (seen.has(p.id)) { errors.push(`${p.id}：檔案裡題號重複，只保留第一題`); return; }
+    seen.add(p.id);
+    const old = findProblem(p.id);
+    if (old) {
+      if (!p.history.length) { p.level = old.level; p.streak = old.streak; p.penalty = old.penalty; p.history = old.history; }
+      deck[deck.indexOf(old)] = p; updated++;
+    } else { deck.push(p); added++; }
+    touch(p);
+  });
+  saveDeck();
+  const warn = ok.filter(p => problemIssue(p));
+  S.filter = 'ALL';
+  if (!findProblem(S.current)) S.current = deck[0].id;
+  startProblem();
+  renderLib();
+  out.innerHTML = `<b style="color:var(--good)">匯入完成：新增 ${added} 題、更新 ${updated} 題</b>` +
+    (warn.length ? `<div style="margin-top:6px">其中 ${warn.length} 題的正解無法照規則下完，已標示「資料有誤」：</div><ul>${warn.map(p => `<li>${esc(p.id)}：${esc(problemIssue(p))}</li>`).join('')}</ul>` : '') +
+    (errors.length ? `<div style="margin-top:6px">略過 ${errors.length} 筆：</div><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
+  $('importText').value = '';
+}
+function exportDeck() {
+  const data = deck.map(p => ({
+    id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution,
+    level: p.level, streak: p.streak, penalty: p.penalty,
+    history: p.history.filter(h => h.moves)
+  }));
+  const d = new Date(), z = n => String(n).padStart(2, '0');
+  const name = `tsumego_${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}.json`;
+  const json = JSON.stringify(data, null, 2);
+  const file = new File([json], name, { type: 'application/json' });
+  const touch = matchMedia('(pointer: coarse)').matches;
+  if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: name }).catch(() => {});
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+
+/* =========================================================
+   雲端同步（Cloudflare Pages Functions + D1）
+   - 所有變更先存本機，再排入待上傳佇列，有網路時自動上傳
+   - 每題有 updatedAt，較新的一方勝出；刪除會留下刪除標記
+   - 用檔案直接開啟（file://）或找不到 /api 時，只用本機儲存
+   ========================================================= */
+const PENDING_KEY = 'tsumego_pending_v1';
+const SYNC_CHUNK = 60;
+let pending = (() => {
+  try { const v = JSON.parse(localStorage.getItem(PENDING_KEY)); if (v && v.up && v.del) return v; } catch (e) {}
+  return { up: {}, del: {} };
+})();
+const sync = { state: location.protocol === 'file:' ? 'local' : 'idle', busy: false, again: false, timer: null, last: 0 };
+
+function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); } catch (e) {} }
+function touch(p) {
+  p.updatedAt = Math.max(Date.now(), (p.updatedAt || 0) + 1);
+  pending.up[p.id] = p.updatedAt;
+  delete pending.del[p.id];
+  deckPristine = false;
+  savePending();
+  scheduleSync();
+}
+function markDeleted(id) {
+  delete pending.up[id];
+  pending.del[id] = Date.now();
+  deckPristine = false;
+  savePending();
+  scheduleSync();
+}
+function scheduleSync(delay = 1500) {
+  if (sync.state === 'local') return;
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(runSync, delay);
+}
+function serializeProblem(p) {
+  return {
+    id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution,
+    level: p.level, streak: p.streak, penalty: p.penalty, updatedAt: p.updatedAt,
+    history: p.history.filter(h => h.moves)   // 舊版的圖片縮圖不上傳
+  };
+}
+async function api(method, path, body) {
+  let res;
+  try {
+    res = await fetch('/api/' + path, {
+      method, credentials: 'same-origin', redirect: 'manual', cache: 'no-store',
+      headers: body ? { 'Content-Type': 'application/json' } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) { throw { kind: 'offline' }; }
+  if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw { kind: 'login' };
+  if (res.status === 404 || res.status === 405) throw { kind: 'local' };
+  let data = null;
+  try { data = await res.json(); } catch (e) { throw { kind: 'local' }; }   // 不是 API（例如純靜態主機）
+  if (res.status === 401) throw { kind: data?.error === 'not_configured' ? 'setup' : 'login', message: data?.message };
+  if (!res.ok) throw { kind: 'error', message: data?.message || ('HTTP ' + res.status) };
+  return data;
+}
+async function runSync() {
+  if (sync.state === 'local') return;
+  if (sync.busy) { sync.again = true; return; }
+  sync.busy = true;
+  setSyncState('busy');
+  try {
+    Object.keys(pending.up).forEach(id => { if (!findProblem(id)) delete pending.up[id]; });
+    const ups = Object.keys(pending.up).map(findProblem).map(serializeProblem);
+    const dels = Object.entries(pending.del).map(([id, deletedAt]) => ({ id, deletedAt }));
+    let rows = null;
+    if (!ups.length && !dels.length) {
+      rows = (await api('GET', 'deck')).problems;
+    } else {
+      for (let k = 0; k < ups.length + dels.length; k += SYNC_CHUNK) {
+        const probs = ups.slice(k, k + SYNC_CHUNK);
+        const ds = dels.slice(Math.max(0, k - ups.length), Math.max(0, k + SYNC_CHUNK - ups.length));
+        const res = await api('POST', 'sync', { problems: probs, deletes: ds });
+        rows = res.problems;
+        // 上傳成功：清除這些項目（若上傳期間又被修改則保留）
+        probs.forEach(p => { if (pending.up[p.id] === p.updatedAt) delete pending.up[p.id]; });
+        ds.forEach(d => { if (pending.del[d.id] === d.deletedAt) delete pending.del[d.id]; });
+        savePending();
+      }
+    }
+    mergeServer(rows || []);
+    sync.last = Date.now();
+    setSyncState(Object.keys(pending.up).length || Object.keys(pending.del).length ? 'busy' : 'ok');
+  } catch (e) {
+    setSyncState(e.kind || 'error', e.message);
+  } finally {
+    sync.busy = false;
+    if (sync.again || (sync.state === 'busy')) { sync.again = false; scheduleSync(300); }
+  }
+}
+function mergeServer(rows) {
+  const onServer = new Set();
+  let changed = false;
+  const live = rows.filter(r => !r.deleted);
+  // 新裝置（只有內建範例）而雲端已有題庫：直接採用雲端，不上傳範例
+  const adoptServer = deckPristine && live.length > 0;
+  for (const r of rows) {
+    onServer.add(r.id);
+    const local = findProblem(r.id);
+    if (r.deleted) {
+      if (local && !pending.up[r.id] && (local.updatedAt || 0) <= r.updatedAt) { deck = deck.filter(p => p !== local); changed = true; }
+      continue;
+    }
+    if (local && pending.up[r.id] && (local.updatedAt || 0) >= r.updatedAt) continue;
+    if (!local || (local.updatedAt || 0) < r.updatedAt) {
+      const n = normalizeProblem(r.data, 0).problem;
+      if (!n) continue;
+      n.updatedAt = r.updatedAt;
+      if (local) deck[deck.indexOf(local)] = n; else deck.push(n);
+      changed = true;
+    }
+  }
+  // 本機有、雲端沒有的題目
+  let needPush = false;
+  for (const p of [...deck]) {
+    if (onServer.has(p.id) || pending.up[p.id]) continue;
+    if (adoptServer) { deck = deck.filter(x => x !== p); changed = true; continue; }
+    p.updatedAt = p.updatedAt || Date.now();
+    pending.up[p.id] = p.updatedAt; needPush = true;
+  }
+  if (adoptServer) deckPristine = false;
+  if (!deck.length) {   // 雲端把題目全刪光了：放回範例，避免畫面沒有題目
+    deck = DEFAULT_PROBLEMS.map((r, i) => normalizeProblem(r, i).problem);
+    deck.forEach(p => { p.updatedAt = Date.now(); pending.up[p.id] = p.updatedAt; });
+    needPush = true; changed = true;
+  }
+  if (needPush) { savePending(); scheduleSync(300); }
+  if (changed) {
+    saveDeck();
+    if (!findProblem(S.current)) startProblem(deck[0].id);
+    else if (S.tab === 'play' && play.state === 'playing' && !play.moves.length) startProblem();
+    else if (S.tab === 'play') renderPlay();
+    if (S.tab === 'lib') renderLib();
+    renderFilterSelects();
+  }
+}
+const SYNC_TEXT = {
+  idle: ['', '同步'], busy: ['busy', '同步中…'], ok: ['ok', '已同步'],
+  offline: ['warn', '離線・稍後同步'], login: ['bad', '需要登入'], setup: ['bad', '伺服器未設定'],
+  error: ['bad', '同步失敗'], local: ['', '僅本機'],
+};
+function setSyncState(state, message) {
+  if (state === 'local') { sync.state = 'local'; $('syncBtn').classList.add('hidden'); return; }
+  sync.state = state;
+  const [cls, text] = SYNC_TEXT[state] || SYNC_TEXT.error;
+  const b = $('syncBtn');
+  b.classList.remove('hidden');
+  b.className = 'sync ' + cls;
+  b.querySelector('span').textContent = text;
+  b.title = message || text;
+}
+$('syncBtn').onclick = () => {
+  if (sync.state === 'login') { location.reload(); return; }
+  if (sync.state === 'setup' || sync.state === 'error') toast($('syncBtn').title);
+  runSync();
+};
+window.addEventListener('online', () => scheduleSync(200));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - sync.last > 20000) scheduleSync(200);
+});
+
+/* =========================================================
+   共用
+   ========================================================= */
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+let toastTimer;
+function toast(msg) {
+  const el = $('toast'); el.textContent = msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+function switchTab(tab) {
+  S.tab = tab;
+  document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === tab));
+  ['play', 'edit', 'lib'].forEach(t => $('view-' + t).classList.toggle('active', t === tab));
+  if (tab === 'play') renderPlay();
+  if (tab === 'edit') { if (!ed) newEditor(); else renderEditor(); }
+  if (tab === 'lib') renderLib();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- 事件綁定 ---------- */
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.tab); });
+$('modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.mode !== S.mode) { S.mode = b.dataset.mode; startProblem(); } });
+$('btnReset').onclick = () => startProblem();
+$('btnHint').onclick = showHint;
+$('btnUndo').onclick = undoFree;
+$('btnCheck').onclick = checkFree;
+$('btnNext').onclick = nextProblem;
+$('playFilter').onchange = e => onFilterChange(e.target.value);
+$('libFilter').onchange = e => onFilterChange(e.target.value);
+$('btnClearHist').onclick = () => {
+  const p = curProblem();
+  if (p.history.length && confirm(`清除「${p.title}」的所有作答紀錄？`)) { p.history = []; touch(p); saveDeck(); renderHistory(); }
+};
+bindBoardTap($('playBoard'), onPlayTap);
+bindBoardTap($('editBoard'), onEditTap);
+
+$('toolSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { ed.tool = b.dataset.tool; renderEditor(); } });
+$('firstSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setFirst(b.dataset.first); });
+$('btnEdUndo').onclick = () => { ed.moves.pop(); renderEditor(); };
+$('btnEdClear').onclick = () => { if (confirm('清空盤面上的所有棋子與手順？')) { ed.black = []; ed.white = []; ed.moves = []; renderEditor(); } };
+$('btnEdNew').onclick = () => newEditor();
+$('btnEdSave').onclick = saveEditor;
+$('edCat').addEventListener('change', () => { if (!ed.origId) $('edId').value = suggestId($('edCat').value.trim()); });
+
+$('libList').addEventListener('click', onLibClick);
+$('libSearch').addEventListener('input', renderLib);
+$('btnLibNew').onclick = () => { newEditor(); switchTab('edit'); };
+$('btnExport').onclick = exportDeck;
+$('btnImport').onclick = () => { $('importResult').innerHTML = ''; $('importModal').classList.add('open'); };
+$('btnImportClose').onclick = () => $('importModal').classList.remove('open');
+$('btnPickFile').onclick = () => $('importFile').click();
+$('importFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => runImport(String(rd.result));
+  rd.onerror = () => { $('importResult').textContent = '讀取檔案失敗'; };
+  rd.readAsText(f, 'utf-8');
+  e.target.value = '';
+};
+$('btnImportRun').onclick = () => {
+  const t = $('importText').value.trim();
+  if (!t) return toast('請先貼上 JSON 內容，或選擇檔案');
+  runImport(t);
+};
+$('btnReviewClose').onclick = () => $('reviewModal').classList.remove('open');
+document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+// 版面尺寸改變（旋轉 iPad、分割畫面）時重畫
+let resizeTimer;
+const redraw = () => { if (S.tab === 'play') drawBoard($('playBoard'), playView()); if (S.tab === 'edit' && ed) renderEditor(); };
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(redraw, 80); });
+if (window.ResizeObserver) {
+  const ro = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(redraw, 30); });
+  document.querySelectorAll('.board-wrap').forEach(el => ro.observe(el));
+}
+
+newEditor();
+startProblem(deck[0].id);
+if (sync.state !== 'local') runSync();
+</script>
+</body>
+</html>
