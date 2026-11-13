@@ -733,7 +733,15 @@ function bindBoardTap(cv, handler) {
     if (moved < 20) handler(e);
   });
   cv.addEventListener('pointercancel', () => { start = null; });
+  // iPad Safari：快速連點會觸發「點兩下放大」，CSS 的 touch-action 不一定擋得住，
+  // 所以直接取消棋盤上觸控事件的預設行為（落子用的是上面的 pointer 事件，不受影響）
+  const block = e => { if (e.cancelable) e.preventDefault(); };
+  cv.addEventListener('touchstart', block, { passive: false });
+  cv.addEventListener('touchend', block, { passive: false });
+  cv.addEventListener('dblclick', block);
 }
+// 棋盤以外的地方也避免雙指縮放手勢誤觸（iOS 專用事件）
+document.addEventListener('gesturestart', e => { if (e.target.closest && e.target.closest('.board-wrap')) e.preventDefault(); });
 
 /* =========================================================
    練習
