@@ -310,6 +310,7 @@
       <div class="seg full" id="toolSeg">
         <button data-tool="B" aria-pressed="true">● 黑子</button>
         <button data-tool="W" aria-pressed="false">○ 白子</button>
+        <button data-tool="T" aria-pressed="false">◎ 目標</button>
         <button data-tool="M" aria-pressed="false">錄手順</button>
       </div>
       <p class="hint-text" id="toolHint"></p>
@@ -460,6 +461,10 @@ function applyMove(grid, size, c, r, color) {
   if (groupAt(grid, size, i).libs === 0) { grid[i] = null; return { ok: false, reason: '此處是禁著點（無氣）' }; }
   return { ok: true, captured };
 }
+/** 題目的目標棋子 → grid index */
+function targetIdx(p) {
+  return (p.targets || []).map(s => parseCoord(s, p.boardSize)).filter(Boolean).map(q => q.r * p.boardSize + q.c);
+}
 /** 依題目初始盤面 + 手順，算出目前盤面 */
 function computePosition(p, moves) {
   const size = p.boardSize, grid = new Array(size * size).fill(null), nums = new Map();
@@ -483,6 +488,7 @@ function computePosition(p, moves) {
    { id, category, title, desc, boardSize,
      initialBlack:["C3",...], initialWhite:[...],
      solution:[{coord:"B2", color:"B", note?}],
+     targets?:["D3",...]   ← 攻殺題要吃掉的棋子（畫成雙圓）
      level, streak, penalty, history:[] }
    ========================================================= */
 function normalizeProblem(raw, idx) {
@@ -542,6 +548,9 @@ function normalizeProblem(raw, idx) {
   if (bad.length) return { error: `${label}：無法辨識的座標 ${bad.slice(0, 3).join('、')}` };
   const dup = ib.find(s => iw.includes(s));
   if (dup) return { error: `${label}：${dup} 同時是黑子與白子` };
+  // 攻殺題的目標棋子（書上以雙圓◎標示）：必須是初始盤面上的棋子
+  const initSet = new Set([...ib, ...iw]);
+  const targets = [...new Set((Array.isArray(raw.targets) ? raw.targets : []).map(s => norm(s)).filter(s => s && initSet.has(s)))];
 
   return {
     problem: {
@@ -553,6 +562,7 @@ function normalizeProblem(raw, idx) {
       initialBlack: [...new Set(ib)],
       initialWhite: [...new Set(iw)],
       solution,
+      targets,
       level: clampInt(raw.level ?? raw.srsLevel, 0, 5, 0),
       streak: clampInt(raw.streak, 0, 9999, 0),
       penalty: clampInt(raw.penalty, 0, 100, 0),
@@ -693,6 +703,17 @@ function drawBoard(cv, view, opts = {}) {
   };
   const visible = i => inView(i % size, Math.floor(i / size));
   view.grid.forEach((col, i) => { if (col && visible(i)) stone(i, col, view.nums?.get(i), 1); });
+  // 目標棋子：在棋子內畫一圈（雙圓◎）；被提掉後就不再顯示
+  (view.targets || []).forEach(i => {
+    const col = view.grid[i];
+    if (!col || !visible(i) || view.nums?.get(i)) return;
+    const [x, y] = xy(i);
+    ctx.save();
+    ctx.strokeStyle = col === 'B' ? '#fff' : '#111';
+    ctx.lineWidth = Math.max(1.2, cell / 16);
+    ctx.beginPath(); ctx.arc(x, y, cell * 0.27, 0, 7); ctx.stroke();
+    ctx.restore();
+  });
   (view.ghosts || []).forEach(g => { if (!view.grid[g.i] && visible(g.i)) stone(g.i, g.color, g.n, 0.38); });
 
   (view.marks || []).forEach(m => {
@@ -786,7 +807,7 @@ function withMarks(pos, ghosts, p) {
   if (play.errorIdx >= 0) marks.push({ i: idx(play.moves[play.errorIdx].coord), type: 'error' });
   if (play.correct) marks.push({ i: idx(play.correct), type: 'correct' });
   if (play.hint) marks.push({ i: idx(play.hint), type: 'hint' });
-  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks };
+  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks, targets: targetIdx(p) };
 }
 
 function renderPlay() {
@@ -820,7 +841,10 @@ function renderStatus() {
   const issue = problemIssue(p);
   if (issue) { tone = 'warn'; t = '這題的資料有問題'; d = issue + '。可到「題庫」按編輯修正。'; }
   else if (play.msg) { ({ tone, t, d } = play.msg); }
-  else if (S.mode === 'AUTO') { t = `${colorName(uc)}先`; d = `你執${colorName(uc)}，電腦會照正解應對。`; }
+  else if (S.mode === 'AUTO') {
+    t = `${colorName(uc)}先`;
+    d = p.targets.length ? `你執${colorName(uc)}，目標是吃掉 ◎ 標示的棋子。` : `你執${colorName(uc)}，電腦會照正解應對。`;
+  }
   else {
     const n = play.moves.length, c = n % 2 === 0 ? uc : other(uc);
     t = `輪到${colorName(c)}（第 ${n + 1} 手）`; d = '自行擺出雙方手順，擺完按「對答案」。';
@@ -962,7 +986,7 @@ function historyView(p, h) {
   const ghosts = errIdx >= 0 ? h.moves.slice(errIdx + 1).map((m, k) => ({ i: idx(m.coord), color: m.color, n: errIdx + 2 + k })).filter(g => g.i >= 0) : [];
   const marks = [];
   if (h.err >= 0 && h.moves[h.err]) marks.push({ i: idx(h.moves[h.err].coord), type: 'error' });
-  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks: marks.filter(m => m.i >= 0) };
+  return { size, grid: pos.grid, nums: pos.nums, ghosts, marks: marks.filter(m => m.i >= 0), targets: targetIdx(p) };
 }
 function renderHistory() {
   const p = curProblem(), box = $('histList');
@@ -1035,6 +1059,7 @@ function newEditor(fromProblem) {
     black: p ? [...p.initialBlack] : [],
     white: p ? [...p.initialWhite] : [],
     moves: p ? p.solution.map(m => ({ ...m })) : [],
+    targets: p ? [...p.targets] : [],
     first: p ? p.solution[0].color : 'B',
     tool: 'B',
   };
@@ -1051,35 +1076,43 @@ function suggestId(cat) {
   do { id = `${prefix}-${String(n).padStart(3, '0')}`; n++; } while (findProblem(id));
   return id;
 }
-const edProblem = () => ({ boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves });
+const edProblem = () => ({ boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves, targets: ed.targets });
 function renderEditor() {
   document.querySelectorAll('#toolSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tool === ed.tool));
   document.querySelectorAll('#firstSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.first === ed.first));
   const nextColor = ed.moves.length % 2 === 0 ? ed.first : other(ed.first);
   $('toolHint').textContent = ed.tool === 'M'
     ? `在棋盤上依序點出正解。下一手：${colorName(nextColor)} ${ed.moves.length + 1}`
-    : `點棋盤放${ed.tool === 'B' ? '黑' : '白'}子；再點一次同色子可移除。`;
+    : ed.tool === 'T'
+      ? `點已擺好的棋子，標成攻殺目標（◎）；再點一次取消。目前 ${ed.targets.length} 顆。`
+      : `點棋盤放${ed.tool === 'B' ? '黑' : '白'}子；再點一次同色子可移除。`;
   $('moveList').innerHTML = ed.moves.length
     ? ed.moves.map((m, k) => `<span class="move-chip ${m.color}">${k + 1}. ${m.coord}</span>`).join('')
     : '<span class="hint-text" style="margin:0">尚未錄製。選「錄手順」後在棋盤上點出正解。</span>';
   $('btnEdUndo').disabled = !ed.moves.length;
   renderFilterSelects();
   const pos = computePosition(edProblem(), ed.moves);
-  drawBoard($('editBoard'), { size: ed.size, grid: pos.grid, nums: pos.nums, marks: [] });
+  drawBoard($('editBoard'), { size: ed.size, grid: pos.grid, nums: pos.nums, marks: [], targets: targetIdx(edProblem()) });
 }
 function onEditTap(e) {
   const q = hitTest($('editBoard'), e);
   if (!q) return;
   const coord = toCoord(q.c, q.r, ed.size);
-  if (ed.tool === 'M') {
+  if (ed.tool === 'T') {
+    if (!ed.black.includes(coord) && !ed.white.includes(coord)) { toast('請點在已擺好的棋子上'); return; }
+    const k = ed.targets.indexOf(coord);
+    if (k >= 0) ed.targets.splice(k, 1); else ed.targets.push(coord);
+  } else if (ed.tool === 'M') {
     const color = ed.moves.length % 2 === 0 ? ed.first : other(ed.first);
     const trial = computePosition(edProblem(), [...ed.moves, { coord, color }]);
     if (trial.illegal >= 0) { toast(trial.reason); return; }
     ed.moves.push({ coord, color });
   } else {
     const mine = ed.tool === 'B' ? ed.black : ed.white, theirs = ed.tool === 'B' ? ed.white : ed.black;
-    if (mine.includes(coord)) mine.splice(mine.indexOf(coord), 1);
-    else { if (theirs.includes(coord)) theirs.splice(theirs.indexOf(coord), 1); mine.push(coord); }
+    if (mine.includes(coord)) {
+      mine.splice(mine.indexOf(coord), 1);
+      if (ed.targets.includes(coord)) ed.targets.splice(ed.targets.indexOf(coord), 1);
+    } else { if (theirs.includes(coord)) theirs.splice(theirs.indexOf(coord), 1); mine.push(coord); }
     if (ed.moves.length && computePosition(edProblem(), ed.moves).illegal >= 0) toast('注意：盤面改變後，已錄的手順有衝突');
   }
   renderEditor();
@@ -1096,7 +1129,7 @@ function saveEditor() {
   if (!ed.moves.length) return toast('請至少錄製 1 手正解');
   const cand = normalizeProblem({
     id, category, title: $('edTitle').value.trim() || id, desc: $('edDesc').value.trim(),
-    boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves
+    boardSize: ed.size, initialBlack: ed.black, initialWhite: ed.white, solution: ed.moves, targets: ed.targets
   }, 0);
   if (cand.error) return toast(cand.error);
   const p = cand.problem, issue = problemIssue(p);
@@ -1106,8 +1139,8 @@ function saveEditor() {
   if (existing && id !== ed.origId && !confirm(`題號「${id}」已存在，要覆蓋它嗎？`)) return;
   const base = findProblem(ed.origId) || existing;
   if (base) {
-    const samePos = JSON.stringify([base.boardSize, base.initialBlack, base.initialWhite, base.solution]) ===
-                    JSON.stringify([p.boardSize, p.initialBlack, p.initialWhite, p.solution]);
+    const samePos = JSON.stringify([base.boardSize, base.initialBlack, base.initialWhite, base.solution, base.targets]) ===
+                    JSON.stringify([p.boardSize, p.initialBlack, p.initialWhite, p.solution, p.targets]);
     p.level = base.level; p.streak = base.streak; p.penalty = base.penalty;
     p.history = samePos ? base.history : [];
     deck = deck.filter(x => x !== base && x.id !== id);
@@ -1152,7 +1185,7 @@ function renderLib() {
       </div>`;
     row.dataset.id = p.id;
     frag.appendChild(row);
-    draws.push([row.querySelector('canvas'), { ...computePosition(p, []), marks: [] }]);
+    draws.push([row.querySelector('canvas'), { ...computePosition(p, []), marks: [], targets: targetIdx(p) }]);
   });
   box.appendChild(frag);
   draws.forEach(([cv, v]) => drawBoard(cv, v, { labels: false, w: 84, h: 54 }));
@@ -1221,7 +1254,7 @@ function runImport(text) {
 function exportDeck() {
   const data = deck.map(p => ({
     id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
-    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution,
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
     level: p.level, streak: p.streak, penalty: p.penalty,
     history: p.history.filter(h => h.moves)
   }));
@@ -1283,7 +1316,7 @@ function scheduleSync(delay = 1500) {
 function serializeProblem(p) {
   return {
     id: p.id, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
-    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution,
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
     level: p.level, streak: p.streak, penalty: p.penalty, updatedAt: p.updatedAt,
     history: p.history.filter(h => h.moves)   // 舊版的圖片縮圖不上傳
   };
@@ -1472,7 +1505,7 @@ bindBoardTap($('editBoard'), onEditTap);
 $('toolSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) { ed.tool = b.dataset.tool; renderEditor(); } });
 $('firstSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setFirst(b.dataset.first); });
 $('btnEdUndo').onclick = () => { ed.moves.pop(); renderEditor(); };
-$('btnEdClear').onclick = () => { if (confirm('清空盤面上的所有棋子與手順？')) { ed.black = []; ed.white = []; ed.moves = []; renderEditor(); } };
+$('btnEdClear').onclick = () => { if (confirm('清空盤面上的所有棋子與手順？')) { ed.black = []; ed.white = []; ed.moves = []; ed.targets = []; renderEditor(); } };
 $('btnEdNew').onclick = () => newEditor();
 $('btnEdSave').onclick = saveEditor;
 $('edCat').addEventListener('change', () => { if (!ed.origId) $('edId').value = suggestId($('edCat').value.trim()); });
