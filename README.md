@@ -5,44 +5,43 @@
 ## 檔案結構
 
 ```
-public/index.html            網頁本體（單一檔案）
-functions/api/[[path]].js    同步 API（Cloudflare Pages Functions）
-samples/quiz.json            範例題庫（可在「題庫 → 匯入」使用）
+public/index.html     網頁本體（單一檔案）
+src/worker.js         同步 API（Cloudflare Worker）
+wrangler.jsonc        Worker 設定：網頁資料夾、D1 資料庫綁定
+samples/quiz.json     範例題庫（可在「題庫 → 匯入」使用）
 ```
 
 - 資料表會在第一次呼叫 API 時自動建立，不需要手動執行 SQL。
 - 直接用瀏覽器開 `public/index.html`，或放在沒有 API 的主機（例如 GitHub Pages）上也能用，只是資料只存在本機（左上角不會出現同步狀態）。
 
-## 部署到 Cloudflare（免費方案）
+## 部署到 Cloudflare Workers（免費方案）
 
 > Cloudflare 後台的選單名稱偶爾會調整，若找不到可用搜尋框找關鍵字。
 
-### 1. 建立 Pages 專案並連結 GitHub
-1. Cloudflare 後台 → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**。
-2. 選擇 `alubapagurian/tsumego`。
-3. 建置設定：
-   - Framework preset：**None**
-   - Build command：（留空）
-   - Build output directory：`public`
-4. 部署完成後會得到網址，例如 `https://tsumego.pages.dev`。之後每次 push 到 GitHub 都會自動重新部署。
+### 1. 建立 D1 資料庫，把 ID 填進 wrangler.jsonc
+1. 後台 → **Storage & Databases** → **D1** → **Create**，名稱填 `tsumego`（已建立過就不用再建）。
+2. 打開這個資料庫，複製頁面上的 **Database ID**（一串像 `xxxxxxxx-xxxx-...` 的文字）。
+3. 在 GitHub 上編輯 `wrangler.jsonc`，把 `"請貼上你的-database-id"` 換成剛才的 ID，然後 commit。
 
-### 2. 建立 D1 資料庫並綁定
-1. 後台 → **Storage & Databases** → **D1** → **Create**，名稱填 `tsumego`。
-2. 回到 Pages 專案 → **Settings** → **Bindings** → **Add** → **D1 database**：
-   - Variable name：`DB`
-   - D1 database：`tsumego`
+### 2. 確認 Worker 名稱
+`wrangler.jsonc` 裡的 `"name"` 必須和 Cloudflare 後台的 Worker 名稱**完全相同**（目前寫的是 `tsumego`）。如果你的 Worker 叫別的名字，就把這裡改成一樣。
 
-### 3. 設定同步密碼
-沒有這一步，API 會拒絕所有同步請求（網頁仍可在本機使用）。
+### 3. 連結 GitHub（已連結可跳過）
+後台 → **Workers & Pages** → 你的 Worker → **Settings** → **Build** → 連結 `alubapagurian/tsumego`。
+- Build command：（留空）
+- Deploy command：`npx wrangler deploy`
 
-1. 先準備一組**至少 12 個字元**、不容易猜到的密碼，例如用密碼管理工具產生。
-2. Pages 專案 → **Settings** → **Variables and Secrets** → **Add**：
+之後每次 push 到 GitHub 都會自動重新部署。網頁會在 `https://tsumego.<你的帳號>.workers.dev`。
+
+### 4. 設定同步密碼
+部署成功、Worker 有程式之後，才能新增變數。
+
+1. 準備一組**至少 12 個字元**、不容易猜到的密碼，例如用密碼管理工具產生。
+2. Worker → **Settings** → **Variables and Secrets** → **Add**：
    - Type：**Secret**（存好後連你自己在後台也看不到內容，請另外記下來）
    - Variable name：`SYNC_PASSWORD`
    - Value：剛才的密碼
-
-### 4. 重新部署
-綁定和變數只會套用到新的部署：Pages 專案 → **Deployments** → 最新一筆 → **Retry deployment**（或 push 任何變更）。
+3. 儲存後會自動套用，不需要重新部署。Secret 不會被之後的 push 覆蓋。
 
 ### 5. 在 iPad 上使用
 1. 用 Safari 開網站，會跳出「雲端同步密碼」視窗，輸入密碼後按「連線」。
@@ -59,7 +58,7 @@ samples/quiz.json            範例題庫（可在「題庫 → 匯入」使用�
 | 同步中… | 正在上傳／下載 |
 | 離線・稍後同步 | 沒有網路；變更已存在本機，連線後自動上傳 |
 | 輸入同步密碼 | 還沒輸入密碼，或密碼不正確（例如後台換過密碼），點一下重新輸入 |
-| 伺服器未設定 | 還沒完成第 3、4 步，或密碼少於 12 個字元 |
+| 伺服器未設定 | 還沒完成第 4 步，或密碼少於 12 個字元 |
 
 ## 同步規則
 - 每一題獨立同步，以最後修改時間較新的一方為準。
@@ -67,4 +66,4 @@ samples/quiz.json            範例題庫（可在「題庫 → 匯入」使用�
 - 新裝置第一次開啟時，會直接採用雲端題庫。
 
 ## 免費額度
-D1 免費方案每天 500 萬次讀取列、10 萬次寫入列；Workers / Pages Functions 每天 10 萬次請求；靜態網頁請求不計費。個人練習的用量遠低於這些上限。超過上限時同步會暫停到隔天（UTC 午夜），不會自動收費。
+D1 免費方案每天 500 萬次讀取列、10 萬次寫入列；Workers 每天 10 萬次請求（只有 `/api/*` 會計入）；靜態網頁請求不計費。個人練習的用量遠低於這些上限。超過上限時同步會暫停到隔天（UTC 午夜），不會自動收費。

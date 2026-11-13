@@ -1,0 +1,22 @@
+{
+  // Worker 名稱：必須和 Cloudflare 後台上的 Worker 名稱完全相同
+  "name": "tsumego",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-11-01",
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    // 只有 /api/* 會執行程式，其餘都是靜態網頁（不計入請求額度）
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "tsumego",
+      // D1 資料庫 ID（後台 → Storage & Databases → D1 → tsumego）
+      "database_id": "dd67d526-a068-494b-b37b-5094e4557e06"
+    }
+  ]
+}
