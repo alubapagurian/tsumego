@@ -133,6 +133,9 @@
   .prob-meta { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--muted); margin-bottom: 2px; }
   .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 600; }
   .chip.warn { background: var(--warn-soft); color: #8a5a00; }
+  .timer { margin-left: auto; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .timer.done { color: var(--good); }
+  .timer.fail { color: var(--bad); }
   .prob-title { font-size: 19px; font-weight: 700; margin: 0; line-height: 1.35; }
   .prob-desc { margin: 6px 0 0; color: var(--muted); font-size: 15px; }
 
@@ -243,7 +246,7 @@
     <div class="board-wrap"><canvas id="playBoard"></canvas></div>
     <div class="under-board">
       <div class="card prob-card">
-        <div class="prob-meta"><span class="chip" id="pCat"></span><span id="pId"></span><span class="chip warn hidden" id="pWarn">資料有誤</span></div>
+        <div class="prob-meta"><span class="chip" id="pCat"></span><span id="pId"></span><span class="chip warn hidden" id="pWarn">資料有誤</span><span class="timer" id="pTimer">⏱ 0:00</span></div>
         <h2 class="prob-title" id="pTitle"></h2>
         <p class="prob-desc" id="pDesc"></p>
       </div>
@@ -259,7 +262,6 @@
 
     <div class="btn-row">
       <button class="btn" id="btnReset">重來</button>
-      <button class="btn" id="btnHint">提示</button>
       <button class="btn hidden" id="btnUndo">悔一手</button>
       <button class="btn hidden" id="btnCheck">對答案</button>
     </div>
@@ -408,7 +410,7 @@
 /* =========================================================
    基本設定與座標
    ========================================================= */
-const APP_VERSION = '2026.11.14c';             // 顯示在題庫頁，用來確認 iPad 載入的是不是最新版
+const APP_VERSION = '2026.11.14d';             // 顯示在題庫頁，用來確認 iPad 載入的是不是最新版
 const LETTERS = 'ABCDEFGHJKLMNOPQRST';     // 跳過 I（圍棋慣例）
 const STORE_KEY = 'go_tsumego_deck_v3';
 const OLD_STORE_KEYS = ['go_tsumego_deck_v2', 'go_tsumego_deck'];
@@ -805,14 +807,54 @@ const S = {
 let play = null;
 const curProblem = () => findProblem(S.current) || deck[0];
 
-function newRound() {
-  play = { moves: [], state: 'playing', errorIdx: -1, hint: null, correct: null, usedHint: false, recorded: false, busy: false, timer: null };
+function newRound(clock) {
+  play = { moves: [], state: 'playing', errorIdx: -1, correct: null, recorded: false, busy: false, timer: null,
+           clock: clock || { elapsed: 0, since: Date.now() } };
 }
+/** 開始一題。同一題還沒對完答案就按「重來」、切換模式或同步重畫時，計時不歸零 */
 function startProblem(id) {
   if (play?.timer) clearTimeout(play.timer);
+  const sameId = play && (!id || id === S.current);
+  const sameRound = sameId && !play.recorded;
   if (id) S.current = id;
-  newRound();
+  newRound(sameRound ? play.clock : null);
+  if (!sameId) noteServed(S.current);
   renderPlay();
+}
+
+/* ---------- 計時：題目一出現就開始，對完答案就停止；App 切到背景時暫停 ---------- */
+const clockMs = c => c.elapsed + (c.since ? Date.now() - c.since : 0);
+function stopClock() { const c = play.clock; if (c.since) { c.elapsed += Date.now() - c.since; c.since = null; } return c.elapsed; }
+function fmtTime(ms) {
+  const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, sec = t % 60, z = n => String(n).padStart(2, '0');
+  return h ? `${h}:${z(m)}:${z(sec)}` : `${m}:${z(sec)}`;
+}
+function renderTimer() {
+  if (!play) return;
+  const el = $('pTimer');
+  el.textContent = '⏱ ' + fmtTime(clockMs(play.clock));
+  el.className = 'timer' + (play.state === 'success' ? ' done' : play.state === 'fail' ? ' fail' : '');
+}
+setInterval(() => { if (play && play.clock.since && S.tab === 'play') renderTimer(); }, 250);
+document.addEventListener('visibilitychange', () => {
+  if (!play || play.state !== 'playing') return;
+  const c = play.clock;
+  if (document.visibilityState === 'hidden') { if (c.since) { c.elapsed += Date.now() - c.since; c.since = null; } }
+  else if (!c.since) c.since = Date.now();
+});
+
+/* ---------- 最近出過的題目：答對的題目在之後 10 題內不再出現（存在這台裝置） ---------- */
+const RECENT_KEY = 'tsumego_recent_v1', RECENT_N = 10;
+let recent = (() => { try { const v = JSON.parse(localStorage.getItem(RECENT_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; } })();
+const saveRecent = () => { try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {} };
+function noteServed(id) {
+  recent.push({ id, ok: false });
+  if (recent.length > RECENT_N) recent = recent.slice(-RECENT_N);
+  saveRecent();
+}
+function noteSolved(id) {
+  for (let k = recent.length - 1; k >= 0; k--) if (recent[k].id === id) { recent[k].ok = true; break; }
+  saveRecent();
 }
 function userColor(p) { return p.solution[0].color; }
 
@@ -835,7 +877,6 @@ function withMarks(pos, ghosts, p) {
   const idx = s => { const q = parseCoord(s, size); return q.r * size + q.c; };
   if (play.errorIdx >= 0) marks.push({ i: idx(play.moves[play.errorIdx].coord), type: 'error' });
   if (play.correct) marks.push({ i: idx(play.correct), type: 'correct' });
-  if (play.hint) marks.push({ i: idx(play.hint), type: 'hint' });
   return { size, grid: pos.grid, nums: pos.nums, ghosts, marks, targets: targetIdx(p) };
 }
 
@@ -855,12 +896,12 @@ function renderPlay() {
   $('btnCheck').classList.toggle('hidden', S.mode !== 'FREE');
   $('btnUndo').disabled = play.state !== 'playing' || play.moves.length === 0;
   $('btnCheck').disabled = play.state !== 'playing' || play.moves.length === 0;
-  $('btnHint').disabled = play.state !== 'playing';
 
   renderStatus();
   renderFilterSelects();
   renderMastery();
   renderHistory();
+  renderTimer();
   drawBoard($('playBoard'), playView());
 }
 
@@ -897,7 +938,6 @@ function onPlayTap(e) {
   // 合法性檢查
   const trial = computePosition(p, [...play.moves, { coord, color }]);
   if (trial.illegal >= 0) { if (trial.reason !== '此處已有棋子') toast(trial.reason); return; }
-  play.hint = null;
 
   if (S.mode === 'FREE') {
     play.moves.push({ coord, color });
@@ -910,8 +950,8 @@ function onPlayTap(e) {
   const expect = p.solution[n];
   play.moves.push({ coord, color });
   if (coord !== expect.coord) {
-    play.state = 'fail'; play.errorIdx = n; play.correct = expect.coord;
-    setMsg('bad', '不是正解', `${coord} 不對，綠圈是正確位置。按「重來」再試一次。`);
+    play.state = 'fail'; play.errorIdx = n;
+    setMsg('bad', '不是正解', `第 ${n + 1} 手 ${coord} 不對。按「重來」再試一次，或按「下一題」。`);
     finishRound(false, `第 ${n + 1} 手錯（${coord}）`);
     renderPlay();
     return;
@@ -924,8 +964,8 @@ function autoReply() {
   const idx = play.moves.length;
   if (idx >= p.solution.length) {
     play.state = 'success';
-    setMsg('good', '正解！', play.usedHint ? '全部手順正確（使用了提示，熟練度不提升）。' : '全部手順正確，做得好！');
-    finishRound(true, play.usedHint ? '正解（看提示）' : '正解');
+    finishRound(true, '正解');
+    setMsg('good', '正解！', `全部手順正確，用時 ${fmtTime(play.ms)}。`);
     renderPlay();
     return;
   }
@@ -950,43 +990,33 @@ function checkFree() {
   }
   if (err === -1 && mv.length >= sol.length) {
     play.state = 'success';
-    setMsg('good', '正解！', play.usedHint ? '全部手順正確（使用了提示，熟練度不提升）。' : '全部手順正確，做得好！');
-    finishRound(true, play.usedHint ? '正解（看提示）' : '正解');
+    finishRound(true, '正解');
+    setMsg('good', '正解！', `全部手順正確，用時 ${fmtTime(play.ms)}。`);
   } else if (err === -1) {
     setMsg('warn', '目前都正確', `已完成 ${mv.length} / ${sol.length} 手，請繼續往下擺。`);
   } else {
     play.state = 'fail'; play.errorIdx = err;
-    play.correct = err < sol.length ? sol[err].coord : null;
     setMsg('bad', `第 ${err + 1} 手錯了`,
-      err < sol.length ? `綠圈是正解位置；之後的手順以淡色保留供檢討。` : `正解只有 ${sol.length} 手，第 ${err + 1} 手之後是多餘的。`);
+      err < sol.length ? `紅圈是錯的那一手，之後的手順以淡色保留供檢討。按「重來」再想想。` : `正解只有 ${sol.length} 手，第 ${err + 1} 手之後是多餘的。`);
     finishRound(false, `第 ${err + 1} 手錯`);
   }
   renderPlay();
 }
 function undoFree() {
   if (play.state !== 'playing' || !play.moves.length) return;
-  play.moves.pop(); play.msg = null; play.hint = null;
+  play.moves.pop(); play.msg = null;
   renderPlay();
 }
-function showHint() {
-  const p = curProblem();
-  if (play.state !== 'playing') return;
-  const idx = play.moves.length;
-  if (idx >= p.solution.length) { toast('已經擺完正解的手數'); return; }
-  play.hint = p.solution[idx].coord;
-  play.usedHint = true;
-  setMsg('', '提示', `第 ${idx + 1} 手：${colorName(p.solution[idx].color)} 下在虛線圈的位置。`);
-  renderPlay();
-}
-
 function finishRound(ok, text) {
   if (play.recorded) return;
   play.recorded = true;
+  play.ms = stopClock();
   const p = curProblem();
-  p.history.unshift({ t: Date.now(), ok, hint: play.usedHint, mode: S.mode, text, moves: play.moves.map(m => ({ ...m })), err: play.errorIdx });
+  p.history.unshift({ t: Date.now(), ok, mode: S.mode, text, ms: play.ms, moves: play.moves.map(m => ({ ...m })), err: play.errorIdx });
   if (p.history.length > 30) p.history.length = 30;
   if (ok) {
-    if (!play.usedHint) p.level = Math.min(5, p.level + 1);
+    noteSolved(p.id);
+    p.level = Math.min(5, p.level + 1);
     p.streak += 1; p.penalty = 0;
   } else {
     p.level = Math.max(0, p.level - 1); p.streak = 0; p.penalty = 50;
@@ -998,7 +1028,8 @@ function finishRound(ok, text) {
 function renderMastery() {
   const p = curProblem();
   $('pDots').innerHTML = Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('');
-  $('pStreak').textContent = p.streak ? `連續答對 ${p.streak} 次` : '';
+  const times = p.history.filter(h => h.ok && h.ms > 0).map(h => h.ms);
+  $('pStreak').textContent = [p.streak ? `連續答對 ${p.streak} 次` : '', times.length ? `最快 ${fmtTime(Math.min(...times))}` : ''].filter(Boolean).join('・');
 }
 
 function fmtDate(h) {
@@ -1031,7 +1062,7 @@ function renderHistory() {
     row.appendChild(thumb);
     const info = document.createElement('div');
     const modeText = h.mode === 'AUTO' ? '自動應答' : h.mode === 'FREE' ? '自由擺子' : h.mode;
-    info.innerHTML = `<div class="r ${h.ok ? 'ok' : 'ng'}">${h.ok ? '✓' : '✗'} ${esc(h.text)}</div><div class="d">${esc(fmtDate(h))}・${esc(modeText)}</div>`;
+    info.innerHTML = `<div class="r ${h.ok ? 'ok' : 'ng'}">${h.ok ? '✓' : '✗'} ${esc(h.text)}</div><div class="d">${esc(fmtDate(h))}・${esc(modeText)}${h.ms > 0 ? '・⏱ ' + fmtTime(h.ms) : ''}</div>`;
     row.appendChild(info);
     row.onclick = () => openReview(p, h);
     box.appendChild(row);
@@ -1039,7 +1070,7 @@ function renderHistory() {
   });
 }
 function openReview(p, h) {
-  $('reviewTitle').textContent = `${h.ok ? '✓' : '✗'} ${h.text}　${fmtDate(h)}`;
+  $('reviewTitle').textContent = `${h.ok ? '✓' : '✗'} ${h.text}　${fmtDate(h)}${h.ms > 0 ? '　⏱ ' + fmtTime(h.ms) : ''}`;
   const v = historyView(p, h);
   $('reviewBoard').classList.toggle('hidden', !v);
   $('reviewImg').classList.toggle('hidden', !!v);
@@ -1055,6 +1086,10 @@ function nextProblem() {
   let list = pool().filter(p => !problemIssue(p));
   if (!list.length) list = pool();
   if (list.length > 1) list = list.filter(p => p.id !== S.current);
+  // 最近 10 題內答對過的先不出；範圍太小全被排除時才放寬
+  const solved = new Set(recent.filter(x => x.ok).map(x => x.id));
+  const fresh = list.filter(p => !solved.has(p.id));
+  if (fresh.length) list = fresh;
   const total = list.reduce((s, p) => s + weight(p), 0);
   let r = Math.random() * total, pick = list[0];
   for (const p of list) { r -= weight(p); if (r <= 0) { pick = p; break; } }
@@ -1609,7 +1644,6 @@ function switchTab(tab) {
 $('tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (b) switchTab(b.dataset.tab); });
 $('modeSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b && b.dataset.mode !== S.mode) { S.mode = b.dataset.mode; startProblem(); } });
 $('btnReset').onclick = () => startProblem();
-$('btnHint').onclick = showHint;
 $('btnUndo').onclick = undoFree;
 $('btnCheck').onclick = checkFree;
 $('btnNext').onclick = nextProblem;
