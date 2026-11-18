@@ -224,6 +224,50 @@
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
   .hidden { display: none !important; }
+  body:not(.is-admin) .admin-only { display: none !important; }
+
+  /* ---------- 登入 / 帳號 ---------- */
+  .login-cover { position: fixed; inset: 0; z-index: 70; background: var(--bg); display: none; align-items: center; justify-content: center; padding: 16px; }
+  .login-cover.open { display: flex; }
+  .login-cover .box { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 24px; width: min(400px, 100%); }
+  .login-cover h2 { margin: 0 0 4px; font-size: 22px; }
+  .acct-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; margin: 10px 0; }
+  .acct-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .acct-row:first-child { border-top: 0; }
+  .acct-row .n { flex: 1; min-width: 90px; font-weight: 600; }
+  .acct-row .n small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  .acct-row.off .n { color: var(--muted); text-decoration: line-through; }
+
+  /* ---------- 統計 ---------- */
+  .stats { max-width: 960px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .stats-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stats-tools select { width: auto; flex: 1 1 150px; }
+  #psTiles { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; }
+  .tile .k { font-size: 13px; color: var(--muted); }
+  .tile .v { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.25; }
+  .tile .s { font-size: 12px; color: var(--muted); }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .chart-box { position: relative; }
+  .chart-box canvas { width: 100%; height: 160px; display: block; touch-action: pan-y; }
+  .chart-tip { position: absolute; pointer-events: none; background: #2b2f33; color: #fff; font-size: 13px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); z-index: 2; }
+  .heat { display: flex; flex-wrap: wrap; gap: 3px; }
+  .heat i { width: 16px; height: 16px; border-radius: 3px; background: #ebe6dc; cursor: pointer; }
+  .heat i.tried0 { background: #b7d3f6; }
+  .heat i.lv1 { background: #86b6ef; } .heat i.lv2 { background: #5598e7; } .heat i.lv3 { background: #2a78d6; }
+  .heat i.lv4 { background: #1c5cab; } .heat i.lv5 { background: #0d366b; }
+  .heat-legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 10px; align-items: center; }
+  .heat-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; vertical-align: -1px; margin-right: 4px; }
+  .heat-group { font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  .heat-group:first-child { margin-top: 0; }
+  .ov-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .ov-table th, .ov-table td { text-align: left; padding: 6px 8px; border-top: 1px solid var(--line); white-space: nowrap; }
+  .ov-table th { color: var(--muted); font-weight: 600; border-top: 0; }
+  .ov-table td.num { font-variant-numeric: tabular-nums; }
+  .ov-table tr[data-uid] { cursor: pointer; }
+  .ov-wrap { overflow-x: auto; }
+  .legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 4px 0 10px; vertical-align: 0; }
 </style>
 </head>
 <body>
@@ -231,12 +275,13 @@
 <header class="topbar">
   <div class="brand-row">
     <div class="brand">詰棋練習</div>
-    <button class="sync hidden" id="syncBtn" title="雲端同步狀態"><i></i><span>同步中…</span></button>
+    <button class="sync hidden" id="syncBtn" title="帳號與同步"><i></i><span>同步中…</span></button>
   </div>
   <nav class="seg" id="tabs">
     <button data-tab="play" aria-pressed="true">練習</button>
-    <button data-tab="edit" aria-pressed="false">製題</button>
+    <button data-tab="stats" aria-pressed="false">統計</button>
     <button data-tab="lib" aria-pressed="false">題庫</button>
+    <button data-tab="edit" aria-pressed="false" class="admin-only">製題</button>
   </nav>
 </header>
 
@@ -342,17 +387,67 @@
       <select id="libGroup" aria-label="大類"></select>
       <select id="libCat" aria-label="子類"></select>
       <input type="text" id="libSearch" placeholder="搜尋題號或名稱">
-      <button class="btn" id="btnImport">匯入</button>
-      <button class="btn" id="btnExport">匯出</button>
-      <button class="btn primary" id="btnLibNew">新增題目</button>
+      <button class="btn admin-only" id="btnImport">匯入</button>
+      <button class="btn admin-only" id="btnExport">匯出</button>
+      <button class="btn primary admin-only" id="btnLibNew">新增題目</button>
     </div>
     <div class="lib-count-row">
       <div class="lib-count" id="libCount"></div>
-      <button class="btn small danger hidden" id="btnDelGroup"></button>
+      <button class="btn small danger hidden admin-only" id="btnDelGroup"></button>
     </div>
     <div class="lib-list" id="libList"></div>
   </div>
 </main>
+
+<!-- ================= 統計 ================= -->
+<main id="view-stats" class="view">
+  <div class="stats">
+    <div class="stats-tools">
+      <select id="statUser" class="admin-only" aria-label="檢視的使用者"></select>
+      <select id="statGroup" aria-label="大類"></select>
+      <select id="statCat" aria-label="子類"></select>
+    </div>
+    <div class="card admin-only" id="ovCard">
+      <h3>全員總覽 <span style="font-weight:400;font-size:13px">（全部題目、累計）</span></h3>
+      <div class="ov-wrap"><table class="ov-table" id="ovTable"></table></div>
+    </div>
+    <div class="empty hidden" id="statMsg"></div>
+    <div class="tiles" id="statTiles"></div>
+    <div class="charts">
+      <div class="card chart-box"><h3>每日作答次數（近 30 天）</h3><canvas id="chDaily"></canvas></div>
+      <div class="card chart-box"><h3>每日正確率（近 30 天）</h3><canvas id="chAcc"></canvas></div>
+      <div class="card chart-box"><h3>每日平均用時（近 30 天）</h3><canvas id="chTime"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>熟悉度方塊圖 <span style="font-weight:400;font-size:13px">點方塊看單題用時趨勢</span></h3>
+      <div id="heat"></div>
+      <div class="heat-legend">
+        <span><i style="background:#ebe6dc"></i>沒做過</span>
+        <span><i style="background:#b7d3f6"></i>熟練度 0</span>
+        <span><i style="background:#86b6ef"></i>1</span><span><i style="background:#5598e7"></i>2</span>
+        <span><i style="background:#2a78d6"></i>3</span><span><i style="background:#1c5cab"></i>4</span>
+        <span><i style="background:#0d366b"></i>5</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- 單題統計 -->
+<div class="modal" id="probStatModal">
+  <div class="box">
+    <h2 id="psTitle"></h2>
+    <div class="tiles" id="psTiles" style="margin-bottom:12px"></div>
+    <div class="chart-box">
+      <h3 style="margin:0 0 6px;font-size:15px;color:var(--muted);font-weight:600">每次作答用時
+        <span style="font-weight:400;font-size:13px"><span class="legend-dot" style="background:#2a78d6"></span>答對<span class="legend-dot" style="background:#d03b3b"></span>答錯 ✗</span></h3>
+      <canvas id="chProb" style="height:200px"></canvas>
+    </div>
+    <div class="btn-row" style="margin-top:12px">
+      <button class="btn" id="btnPsClose">關閉</button>
+      <button class="btn primary" id="btnPsPlay">練這題</button>
+    </div>
+  </div>
+</div>
 
 <!-- 匯入對話框 -->
 <div class="modal" id="importModal">
@@ -374,22 +469,41 @@
   </div>
 </div>
 
-<!-- 同步密碼 -->
-<div class="modal" id="pwModal">
+<!-- 登入 -->
+<div class="login-cover" id="loginCover">
   <div class="box">
-    <h2>雲端同步密碼</h2>
-    <p class="hint-text" style="margin-top:0">輸入在 Cloudflare 設定的 SYNC_PASSWORD。每台裝置只需輸入一次，密碼會存在這台裝置的瀏覽器裡。</p>
-    <form id="pwForm" autocomplete="on">
-      <input type="text" name="username" value="tsumego" autocomplete="username" class="hidden" readonly>
-      <input type="password" id="pwInput" autocomplete="current-password" placeholder="同步密碼"
-             style="min-height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;width:100%;font-size:16px">
-      <div class="import-result" id="pwMsg"></div>
-      <div class="btn-row" style="margin-top:12px">
-        <button type="button" class="btn danger" id="btnPwForget">清除密碼</button>
-        <button type="button" class="btn" id="btnPwCancel">取消</button>
-        <button type="submit" class="btn primary">連線</button>
-      </div>
+    <h2>詰棋練習</h2>
+    <p class="hint-text" style="margin:0 0 14px">請輸入管理者給你的名稱和密碼。這台裝置會記住登入。</p>
+    <form id="loginForm" autocomplete="on">
+      <div class="field"><label for="loginName">名稱</label><input type="text" id="loginName" name="username" autocomplete="username" autocapitalize="off" autocorrect="off"></div>
+      <div class="field"><label for="loginPw">密碼</label><input type="password" id="loginPw" name="password" autocomplete="current-password"
+             style="min-height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;width:100%;font-size:16px;margin-top:4px"></div>
+      <div class="import-result" id="loginMsg" style="margin:0 0 10px"></div>
+      <button type="submit" class="btn primary" style="width:100%">登入</button>
     </form>
+  </div>
+</div>
+
+<!-- 帳號 -->
+<div class="modal" id="acctModal">
+  <div class="box">
+    <h2 id="acctTitle"></h2>
+    <p class="hint-text" style="margin-top:0" id="acctSync"></p>
+    <div class="btn-row">
+      <button class="btn" id="btnSyncNow">立即同步</button>
+      <button class="btn danger" id="btnLogout">登出</button>
+    </div>
+    <div class="admin-only" style="margin-top:18px">
+      <h3 style="margin:0;font-size:16px">帳號管理 <span class="hint-text" id="acctCount"></span></h3>
+      <div class="acct-list" id="acctList"></div>
+      <form id="acctAddForm" class="field-row" style="align-items:flex-end">
+        <div class="field" style="margin:0"><label for="newName">新帳號名稱</label><input type="text" id="newName" autocomplete="off" autocapitalize="off"></div>
+        <div class="field" style="margin:0"><label for="newPw">密碼（至少 4 字）</label><input type="text" id="newPw" autocomplete="off" autocapitalize="off"></div>
+        <button type="submit" class="btn primary" style="flex:0 0 auto">新增</button>
+      </form>
+      <div class="import-result" id="acctMsg"></div>
+    </div>
+    <div class="btn-row" style="margin-top:14px"><button class="btn" id="btnAcctClose">關閉</button></div>
   </div>
 </div>
 
@@ -410,10 +524,10 @@
 /* =========================================================
    基本設定與座標
    ========================================================= */
-const APP_VERSION = '2026.11.14d';             // 顯示在題庫頁，用來確認 iPad 載入的是不是最新版
+const APP_VERSION = '2026.11.18a';             // 顯示在題庫頁，用來確認 iPad 載入的是不是最新版
 const LETTERS = 'ABCDEFGHJKLMNOPQRST';     // 跳過 I（圍棋慣例）
-const STORE_KEY = 'go_tsumego_deck_v3';
-const OLD_STORE_KEYS = ['go_tsumego_deck_v2', 'go_tsumego_deck'];
+const STORE_KEY = 'go_tsumego_deck_v4';      // 只存題目；個人作答紀錄另外存（見「作答紀錄」）
+const OLD_STORE_KEYS = ['go_tsumego_deck_v3', 'go_tsumego_deck_v2', 'go_tsumego_deck'];
 const SIZES = [9, 13, 19];
 // 所有題目都放在 19 路大棋盤的左下角，只顯示 橫 13（A–N）× 直 8（1–8）
 const BOARD = 19, VIEW_COLS = 13, VIEW_ROWS = 8;
@@ -499,7 +613,7 @@ function computePosition(p, moves) {
      initialBlack:["C3",...], initialWhite:[...],
      solution:[{coord:"B2", color:"B", note?}],
      targets?:["D3",...]   ← 攻殺題要吃掉的棋子（畫成雙圓）
-     level, streak, penalty, history:[] }
+   個人的作答紀錄不在題目裡，見「作答紀錄」 }
    ========================================================= */
 function normalizeProblem(raw, idx) {
   if (!raw || typeof raw !== 'object') return { error: `第 ${idx + 1} 筆不是題目物件` };
@@ -539,7 +653,6 @@ function normalizeProblem(raw, idx) {
     return LETTERS[x] + y;
   };
   const norm = mapCoord;
-  const transformed = flipX || flipY || shiftX || shiftY || size !== BOARD;
 
   const bad = [];
   const ib = black.map(s => norm(s) || (bad.push(s), null)).filter(Boolean);
@@ -574,26 +687,11 @@ function normalizeProblem(raw, idx) {
       initialWhite: [...new Set(iw)],
       solution,
       targets,
-      level: clampInt(raw.level ?? raw.srsLevel, 0, 5, 0),
-      streak: clampInt(raw.streak, 0, 9999, 0),
-      penalty: clampInt(raw.penalty, 0, 100, 0),
       updatedAt: Number.isFinite(+raw.updatedAt) ? +raw.updatedAt : 0,
-      history: Array.isArray(raw.history) ? raw.history.map(h => {
-        h = normalizeHistory(h);
-        if (!h || !h.moves || !transformed) return h;
-        const moves = h.moves.map(m => ({ ...m, coord: norm(m.coord) }));
-        return moves.every(m => m.coord) ? { ...h, moves } : null;
-      }).filter(Boolean) : []
     }
   };
 }
 function clampInt(v, lo, hi, d) { v = parseInt(v, 10); return Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d; }
-function normalizeHistory(h) {
-  if (!h || typeof h !== 'object') return null;
-  if ('ok' in h) return h;
-  // 舊版紀錄（含縮圖）
-  return { t: null, dateText: h.date || '', ok: !!h.isSuccess, text: h.resultText || '', mode: h.modeText || '', thumb: h.thumbnail || null };
-}
 /** 檢查題目是否能照正解下完；回傳錯誤訊息或 null（結果快取在題目物件上，題目內容改變時會換成新物件） */
 const issueCache = new WeakMap();
 function problemIssue(p) {
@@ -806,6 +904,7 @@ const S = {
 };
 let play = null;
 const curProblem = () => findProblem(S.current) || deck[0];
+const isAdmin = () => auth.user?.role === 'admin';
 
 function newRound(clock) {
   play = { moves: [], state: 'playing', errorIdx: -1, correct: null, recorded: false, busy: false, timer: null,
@@ -843,19 +942,6 @@ document.addEventListener('visibilitychange', () => {
   else if (!c.since) c.since = Date.now();
 });
 
-/* ---------- 最近出過的題目：答對的題目在之後 10 題內不再出現（存在這台裝置） ---------- */
-const RECENT_KEY = 'tsumego_recent_v1', RECENT_N = 10;
-let recent = (() => { try { const v = JSON.parse(localStorage.getItem(RECENT_KEY)); return Array.isArray(v) ? v : []; } catch (e) { return []; } })();
-const saveRecent = () => { try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {} };
-function noteServed(id) {
-  recent.push({ id, ok: false });
-  if (recent.length > RECENT_N) recent = recent.slice(-RECENT_N);
-  saveRecent();
-}
-function noteSolved(id) {
-  for (let k = recent.length - 1; k >= 0; k--) if (recent[k].id === id) { recent[k].ok = true; break; }
-  saveRecent();
-}
 function userColor(p) { return p.solution[0].color; }
 
 function playView() {
@@ -1011,25 +1097,28 @@ function finishRound(ok, text) {
   if (play.recorded) return;
   play.recorded = true;
   play.ms = stopClock();
-  const p = curProblem();
-  p.history.unshift({ t: Date.now(), ok, mode: S.mode, text, ms: play.ms, moves: play.moves.map(m => ({ ...m })), err: play.errorIdx });
-  if (p.history.length > 30) p.history.length = 30;
+  const p = curProblem(), g = progW(p.id), t = Date.now();
+  g.history.unshift({ t, ok, mode: S.mode, text, ms: play.ms, moves: play.moves.map(m => ({ ...m })), err: play.errorIdx });
+  if (g.history.length > HIST_KEEP) g.history.length = HIST_KEEP;
+  g.log.push({ t, ok: ok ? 1 : 0, ms: play.ms });
+  if (g.log.length > LOG_KEEP) g.log = g.log.slice(-LOG_KEEP);
+  g.n += 1; g.ms += play.ms; g.last = t;
   if (ok) {
     noteSolved(p.id);
-    p.level = Math.min(5, p.level + 1);
-    p.streak += 1; p.penalty = 0;
+    g.ok += 1;
+    g.level = Math.min(5, g.level + 1);
+    g.streak += 1; g.penalty = 0;
   } else {
-    p.level = Math.max(0, p.level - 1); p.streak = 0; p.penalty = 50;
+    g.level = Math.max(0, g.level - 1); g.streak = 0; g.penalty = 50;
   }
-  touch(p);
-  saveDeck();
+  touchProg(p.id);
 }
 
 function renderMastery() {
-  const p = curProblem();
-  $('pDots').innerHTML = Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('');
-  const times = p.history.filter(h => h.ok && h.ms > 0).map(h => h.ms);
-  $('pStreak').textContent = [p.streak ? `連續答對 ${p.streak} 次` : '', times.length ? `最快 ${fmtTime(Math.min(...times))}` : ''].filter(Boolean).join('・');
+  const g = prog(curProblem().id);
+  $('pDots').innerHTML = Array.from({ length: 5 }, (_, k) => `<i class="${k < g.level ? 'on' : ''}"></i>`).join('');
+  const times = g.log.filter(h => h.ok && h.ms > 0).map(h => h.ms);
+  $('pStreak').textContent = [g.streak ? `連續答對 ${g.streak} 次` : '', times.length ? `最快 ${fmtTime(Math.min(...times))}` : ''].filter(Boolean).join('・');
 }
 
 function fmtDate(h) {
@@ -1049,10 +1138,10 @@ function historyView(p, h) {
   return { size, grid: pos.grid, nums: pos.nums, ghosts, marks: marks.filter(m => m.i >= 0), targets: targetIdx(p) };
 }
 function renderHistory() {
-  const p = curProblem(), box = $('histList');
+  const p = curProblem(), box = $('histList'), hist = prog(p.id).history;
   box.innerHTML = '';
-  if (!p.history.length) { box.innerHTML = '<div class="empty">還沒有紀錄，完成一次作答後會出現在這裡。</div>'; return; }
-  p.history.forEach((h, k) => {
+  if (!hist.length) { box.innerHTML = '<div class="empty">還沒有紀錄，完成一次作答後會出現在這裡。</div>'; return; }
+  hist.forEach((h, k) => {
     const row = document.createElement('div');
     row.className = 'hist-item';
     let thumb;
@@ -1081,7 +1170,7 @@ function openReview(p, h) {
 
 /* ---------- 出題範圍 / 下一題 ---------- */
 const pool = () => deck.filter(p => (S.group === 'ALL' || groupOf(p) === S.group) && (S.cat === 'ALL' || p.category === S.cat));
-function weight(p) { return Math.floor(100 / (1 + 1.5 * p.level)) + p.penalty; }
+function weight(p) { const g = prog(p.id); return Math.floor(100 / (1 + 1.5 * g.level)) + g.penalty; }
 function nextProblem() {
   let list = pool().filter(p => !problemIssue(p));
   if (!list.length) list = pool();
@@ -1125,6 +1214,7 @@ function onFilterChange(kind, v) {
   if (list.length && !list.some(p => p.id === S.current)) startProblem(list[0].id);
   else renderPlay();
   if (S.tab === 'lib') renderLib();
+  if (S.tab === 'stats') renderStats();
 }
 
 /* =========================================================
@@ -1205,6 +1295,7 @@ function setFirst(c) {
   renderEditor();
 }
 function saveEditor() {
+  if (!isAdmin()) return toast('只有管理者可以修改題目');
   const group = $('edGroup').value.trim();
   const category = $('edCat').value.trim() || '未分類';
   const id = $('edId').value.trim() || suggestId(group, category);
@@ -1222,10 +1313,6 @@ function saveEditor() {
   if (existing && id !== ed.origId && !confirm(`題號「${id}」已存在，要覆蓋它嗎？`)) return;
   const base = findProblem(ed.origId) || existing;
   if (base) {
-    const samePos = JSON.stringify([base.boardSize, base.initialBlack, base.initialWhite, base.solution, base.targets]) ===
-                    JSON.stringify([p.boardSize, p.initialBlack, p.initialWhite, p.solution, p.targets]);
-    p.level = base.level; p.streak = base.streak; p.penalty = base.penalty;
-    p.history = samePos ? base.history : [];
     deck = deck.filter(x => x !== base && x.id !== id);
     if (base.id !== p.id) markDeleted(base.id);
   }
@@ -1269,10 +1356,10 @@ function renderLib() {
       <div class="info" data-act="play">
         <div class="t">${esc(p.title)}</div>
         <div class="m"><span class="chip">${esc(catLabel(p))}</span><span>${esc(p.title !== p.id ? p.id : '')}</span>
-          <span class="dots">${Array.from({ length: 5 }, (_, k) => `<i class="${k < p.level ? 'on' : ''}"></i>`).join('')}</span>
+          <span class="dots">${Array.from({ length: 5 }, (_, k) => `<i class="${k < prog(p.id).level ? 'on' : ''}"></i>`).join('')}</span>
           ${issue ? `<span class="chip warn" title="${esc(issue)}">資料有誤</span>` : ''}</div>
       </div>
-      <div class="acts">
+      <div class="acts admin-only">
         <button class="btn small" data-act="edit">編輯</button>
         <button class="btn small danger" data-act="del">刪除</button>
       </div>`;
@@ -1295,10 +1382,11 @@ function onLibClick(e) {
   const id = t.closest('.lib-item').dataset.id, p = findProblem(id);
   if (!p) return;
   if (t.dataset.act === 'play') { startProblem(id); switchTab('play'); }
+  if (!isAdmin()) return;
   if (t.dataset.act === 'edit') { newEditor(p); switchTab('edit'); }
   if (t.dataset.act === 'del') {
     if (deck.length <= 1) return toast('題庫至少要保留一題');
-    if (!confirm(`刪除「${p.title}」（${p.id}）？作答紀錄也會一起刪除。`)) return;
+    if (!confirm(`刪除「${p.title}」（${p.id}）？所有人都看不到這題了。`)) return;
     deck = deck.filter(x => x !== p);
     markDeleted(id);
     saveDeck();
@@ -1308,16 +1396,6 @@ function onLibClick(e) {
 }
 
 /* ---------- 匯入 / 匯出 ---------- */
-/** 把舊題目的作答進度合併到新題目：紀錄合在一起，熟練度以最近作答的那份為準 */
-function mergeProgress(p, olds) {
-  const hist = olds.flatMap(o => o.history || []);
-  const seen = new Set();
-  p.history = hist.filter(h => { const k = (h.t || h.dateText) + '|' + h.text; if (seen.has(k)) return false; seen.add(k); return true; })
-    .sort((a, b) => (b.t || 0) - (a.t || 0)).slice(0, 30);
-  const lastT = o => Math.max(0, ...(o.history || []).map(h => h.t || 0));
-  const src = olds.slice().sort((a, b) => lastT(b) - lastT(a) || (b.level - a.level))[0];
-  p.level = src.level; p.streak = src.streak; p.penalty = src.penalty;
-}
 function runImport(text) {
   const out = $('importResult');
   let data;
@@ -1331,7 +1409,7 @@ function runImport(text) {
   if (!ok.length) { out.innerHTML = `<b style="color:var(--bad)">沒有可匯入的題目</b><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`; return; }
 
   const mode = document.querySelector('input[name=importMode]:checked').value;
-  if (mode === 'replace' && !confirm(`要用這 ${ok.length} 題取代目前整個題庫（${deck.length} 題）嗎？目前的題目與紀錄會被刪除。`)) return;
+  if (mode === 'replace' && !confirm(`要用這 ${ok.length} 題取代目前整個題庫（${deck.length} 題）嗎？不在檔案裡的題目會被刪除。`)) return;
 
   let added = 0, updated = 0, migrated = 0;
   if (mode === 'replace') {
@@ -1346,8 +1424,6 @@ function runImport(text) {
     const same = findProblem(p.id);
     // 舊版沒有大類時匯入的同一題（題號是「死活-1」）：合併進度後移除
     const legacy = p.group ? deck.find(q => q !== same && !q.group && q.category === p.category && q.id === p.title) : null;
-    const olds = [same, legacy].filter(Boolean);
-    if (olds.length && !p.history.length) mergeProgress(p, olds);
     if (legacy) { deck = deck.filter(q => q !== legacy); markDeleted(legacy.id); migrated++; }
     if (same) { deck[deck.indexOf(same)] = p; updated++; }
     else if (legacy) { deck.push(p); updated++; }
@@ -1361,7 +1437,7 @@ function runImport(text) {
   startProblem();
   renderLib();
   out.innerHTML = `<b style="color:var(--good)">匯入完成：新增 ${added} 題、更新 ${updated} 題</b>` +
-    (migrated ? `<div style="margin-top:6px">其中 ${migrated} 題是舊版沒有大類的同一題，已改用新題號並保留作答進度。</div>` : '') +
+    (migrated ? `<div style="margin-top:6px">其中 ${migrated} 題是舊版沒有大類的同一題，已改用新題號。</div>` : '') +
     (warn.length ? `<div style="margin-top:6px">其中 ${warn.length} 題的正解無法照規則下完，已標示「資料有誤」：</div><ul>${warn.map(p => `<li>${esc(p.id)}：${esc(problemIssue(p))}</li>`).join('')}</ul>` : '') +
     (errors.length ? `<div style="margin-top:6px">略過 ${errors.length} 筆：</div><ul>${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>` : '');
   $('importText').value = '';
@@ -1369,9 +1445,7 @@ function runImport(text) {
 function exportDeck() {
   const data = deck.map(p => ({
     id: p.id, group: p.group, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
-    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
-    level: p.level, streak: p.streak, penalty: p.penalty,
-    history: p.history.filter(h => h.moves)
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets
   }));
   const d = new Date(), z = n => String(n).padStart(2, '0');
   const name = `tsumego_${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}.json`;
@@ -1391,28 +1465,111 @@ function exportDeck() {
 
 
 /* =========================================================
-   雲端同步（Cloudflare Workers + D1）
-   - 所有變更先存本機，再排入待上傳佇列，有網路時自動上傳
-   - 每題有 updatedAt，較新的一方勝出；刪除會留下刪除標記
-   - 用檔案直接開啟（file://）或找不到 /api 時，只用本機儲存
+   帳號（登入資訊存在這台裝置）
+   - 管理者：可以製題、改題庫、管理帳號，並查看所有人的統計
+   - 使用者：只能練習；作答紀錄各自分開
+   - 用檔案直接開啟（file://）時沒有伺服器：當成本機管理者
    ========================================================= */
-const PENDING_KEY = 'tsumego_pending_v1';
-const PW_KEY = 'tsumego_sync_password';
-const getPw = () => { try { return localStorage.getItem(PW_KEY) || ''; } catch (e) { return ''; } };
-const setPw = v => { try { v ? localStorage.setItem(PW_KEY, v) : localStorage.removeItem(PW_KEY); localStorage.removeItem('tsumego_sync_ts'); } catch (e) {} if (typeof sync !== 'undefined') sync.since = 0; };
-const SYNC_CHUNK = 60;
-const SYNC_TS_KEY = 'tsumego_sync_ts';   // 上次同步時的伺服器時間：之後只下載這之後的變動
+const AUTH_KEY = 'tsumego_auth_v1';
+const LOCAL_MODE = location.protocol === 'file:';
+let auth = LOCAL_MODE ? { token: '', user: { id: 0, name: '本機', role: 'admin' } } : (() => {
+  try { const v = JSON.parse(localStorage.getItem(AUTH_KEY)); if (v && v.token && v.user) return v; } catch (e) {}
+  return { token: '', user: null };
+})();
+function saveAuth() { try { auth.token ? localStorage.setItem(AUTH_KEY, JSON.stringify(auth)) : localStorage.removeItem(AUTH_KEY); } catch (e) {} }
+function applyRole() {
+  document.body.classList.toggle('is-admin', isAdmin());
+  if (!isAdmin() && S.tab === 'edit') switchTab('play');
+}
+// 舊版的共用同步密碼已不再使用
+try { ['tsumego_sync_password', 'tsumego_sync_ts', 'tsumego_pending_v1'].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+
+/* =========================================================
+   作答紀錄：每個使用者、每題一筆
+   { level, streak, penalty,           ← 熟練度（出題權重用）
+     n, ok, ms, last,                  ← 累計作答次數、答對次數、總用時、最後作答時間（統計用）
+     log:[{t, ok, ms}],                ← 每次作答（趨勢圖用，最多 LOG_KEEP 筆）
+     history:[...],                    ← 最近幾次的完整手順（作答紀錄清單用）
+     updatedAt }
+   ========================================================= */
+const HIST_KEEP = 20, LOG_KEEP = 300;
+const EMPTY_PROG = Object.freeze({ level: 0, streak: 0, penalty: 0, n: 0, ok: 0, ms: 0, last: 0, log: Object.freeze([]), history: Object.freeze([]), updatedAt: 0 });
+const progKey = () => 'tsumego_prog_v1_' + (auth.user ? auth.user.id : 'none');
+let progStore = loadProg();
+function loadProg() {
+  try { const v = JSON.parse(localStorage.getItem(progKey())); if (v && v.map) return { map: v.map, pending: v.pending || {}, since: v.since || 0 }; } catch (e) {}
+  return { map: {}, pending: {}, since: 0 };
+}
+let progTimer = null;
+function saveProg() { clearTimeout(progTimer); progTimer = setTimeout(saveProgNow, 400); }
+function saveProgNow() {
+  clearTimeout(progTimer); progTimer = null;
+  try { localStorage.setItem(progKey(), JSON.stringify(progStore)); } catch (e) { toast('儲存空間不足，請清除部分作答紀錄'); }
+}
+window.addEventListener('pagehide', () => { if (progTimer) saveProgNow(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && progTimer) saveProgNow(); });
+const prog = id => progStore.map[id] || EMPTY_PROG;
+function progW(id) {
+  let g = progStore.map[id];
+  if (!g) g = progStore.map[id] = { ...EMPTY_PROG, log: [], history: [] };
+  return g;
+}
+function touchProg(id) {
+  const g = progW(id);
+  g.updatedAt = Math.max(Date.now(), (g.updatedAt || 0) + 1);
+  progStore.pending[id] = g.updatedAt;
+  saveProg();
+  scheduleSync();
+}
+function cleanProg(d) {
+  if (!d || typeof d !== 'object') return null;
+  const num = v => (Number.isFinite(+v) ? +v : 0);
+  return {
+    level: clampInt(d.level, 0, 5, 0), streak: num(d.streak), penalty: num(d.penalty),
+    n: num(d.n), ok: num(d.ok), ms: num(d.ms), last: num(d.last),
+    log: Array.isArray(d.log) ? d.log.filter(x => x && x.t) : [],
+    history: Array.isArray(d.history) ? d.history.filter(x => x && typeof x === 'object') : [],
+    updatedAt: num(d.updatedAt),
+  };
+}
+
+/* ---------- 最近出過的題目：答對的題目在之後 10 題內不再出現 ---------- */
+const RECENT_N = 10;
+const recentKey = () => 'tsumego_recent_v2_' + (auth.user ? auth.user.id : 'none');
+let recent = loadRecent();
+function loadRecent() { try { const v = JSON.parse(localStorage.getItem(recentKey())); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+const saveRecent = () => { try { localStorage.setItem(recentKey(), JSON.stringify(recent)); } catch (e) {} };
+function noteServed(id) {
+  recent.push({ id, ok: false });
+  if (recent.length > RECENT_N) recent = recent.slice(-RECENT_N);
+  saveRecent();
+}
+function noteSolved(id) {
+  for (let k = recent.length - 1; k >= 0; k--) if (recent[k].id === id) { recent[k].ok = true; break; }
+  saveRecent();
+}
+
+/* =========================================================
+   雲端同步（Cloudflare Workers + D1）
+   - 題目：所有人下載；只有管理者能上傳變更
+   - 作答紀錄：每人只同步自己的
+   - 所有變更先存本機，再排入待上傳佇列，有網路時自動上傳；以 updatedAt 較新的一方為準
+   ========================================================= */
+const PENDING_KEY = 'tsumego_pending_v2';       // 題目的待上傳變更（管理者）
+const SYNC_TS_KEY = 'tsumego_sync_ts_v2';       // 上次同步題目時的伺服器時間
+const SYNC_CHUNK = 60, PROG_CHUNK = 100;
 let pending = (() => {
   try { const v = JSON.parse(localStorage.getItem(PENDING_KEY)); if (v && v.up && v.del) return v; } catch (e) {}
   return { up: {}, del: {} };
 })();
-const sync = { state: location.protocol === 'file:' ? 'local' : 'idle', busy: false, again: false, timer: null, last: 0,
+const sync = { state: LOCAL_MODE ? 'local' : 'idle', busy: false, again: false, timer: null, last: 0,
   since: (() => { try { return Number(localStorage.getItem(SYNC_TS_KEY)) || 0; } catch (e) { return 0; } })() };
 function setSince(v) { sync.since = v; try { localStorage.setItem(SYNC_TS_KEY, String(v)); } catch (e) {} }
 
 function savePending() { try { localStorage.setItem(PENDING_KEY, JSON.stringify(pending)); } catch (e) {} }
 function touch(p) {
   p.updatedAt = Math.max(Date.now(), (p.updatedAt || 0) + 1);
+  if (!isAdmin()) return;
   pending.up[p.id] = p.updatedAt;
   delete pending.del[p.id];
   deckPristine = false;
@@ -1420,6 +1577,7 @@ function touch(p) {
   scheduleSync();
 }
 function markDeleted(id) {
+  if (!isAdmin()) return;
   delete pending.up[id];
   pending.del[id] = Date.now();
   deckPristine = false;
@@ -1430,120 +1588,146 @@ function markDeleted(id) {
 function deleteProblems(ids) {
   const set = new Set(ids), now = Date.now();
   deck = deck.filter(p => !set.has(p.id));
-  ids.forEach(id => { delete pending.up[id]; pending.del[id] = now; });
+  if (isAdmin()) ids.forEach(id => { delete pending.up[id]; pending.del[id] = now; });
   deckPristine = false;
   savePending(); saveDeck(); scheduleSync();
 }
 /**
- * 清理舊版重複題：沒有大類的題目，若有「同子類、且名稱等於它題號」的有大類版本
- * （例：舊的「死活-1」對上「階三-死活-1」），就把進度合併到新的那題並刪除舊的。
+ * 清理舊版重複題（只有管理者會執行）：沒有大類的題目，若有「同子類、且名稱等於它題號」的有大類版本
+ * （例：舊的「死活-1」對上「階三-死活-1」），就刪除舊的。
  */
 function cleanupLegacy() {
+  if (!isAdmin()) return 0;
   const byKey = new Map();
   deck.forEach(q => { if (q.group) byKey.set(q.category + '|' + q.title, q); });
   if (!byKey.size) return 0;
-  const gone = [];
-  deck.forEach(p => {
-    if (p.group) return;
-    const q = byKey.get(p.category + '|' + p.id);
-    if (!q) return;
-    if (p.history.length) {
-      const before = JSON.stringify([q.level, q.history.length]);
-      mergeProgress(q, [q, p]);
-      if (JSON.stringify([q.level, q.history.length]) !== before) touch(q);
-    }
-    gone.push(p.id);
-  });
+  const gone = deck.filter(p => !p.group && byKey.has(p.category + '|' + p.id)).map(p => p.id);
   if (gone.length) deleteProblems(gone);
   return gone.length;
 }
 function scheduleSync(delay = 1500) {
-  if (sync.state === 'local') return;
+  if (sync.state === 'local' || !auth.token) return;
   clearTimeout(sync.timer);
   sync.timer = setTimeout(runSync, delay);
 }
 function serializeProblem(p) {
   return {
     id: p.id, group: p.group, category: p.category, title: p.title, desc: p.desc, boardSize: p.boardSize,
-    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets,
-    level: p.level, streak: p.streak, penalty: p.penalty, updatedAt: p.updatedAt,
-    history: p.history.filter(h => h.moves)   // 舊版的圖片縮圖不上傳
+    initialBlack: p.initialBlack, initialWhite: p.initialWhite, solution: p.solution, targets: p.targets, updatedAt: p.updatedAt,
   };
 }
-async function api(method, path, body) {
+async function api(method, path, body, noAuth) {
   let res;
   try {
     res = await fetch('/api/' + path, {
       method, credentials: 'same-origin', redirect: 'manual', cache: 'no-store',
-      headers: Object.assign(body ? { 'Content-Type': 'application/json' } : {}, getPw() ? { Authorization: 'Bearer ' + getPw() } : {}),
+      headers: Object.assign(body ? { 'Content-Type': 'application/json' } : {}, !noAuth && auth.token ? { Authorization: 'Bearer ' + auth.token } : {}),
       body: body ? JSON.stringify(body) : undefined,
     });
-  } catch (e) { throw { kind: 'offline' }; }
-  if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw { kind: 'login' };
-  if (res.status === 404 || res.status === 405) throw { kind: 'local' };
+  } catch (e) { throw { kind: 'offline', message: '連不上伺服器' }; }
+  if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) throw { kind: 'error', message: '伺服器回應異常' };
   let data = null;
-  try { data = await res.json(); } catch (e) { throw { kind: 'local' }; }   // 不是 API（例如純靜態主機）
+  try { data = await res.json(); } catch (e) { throw { kind: 'error', message: '伺服器回應不是 API（HTTP ' + res.status + '）' }; }
   if (res.status === 401) throw { kind: data?.error === 'not_configured' ? 'setup' : 'login', code: data?.error, message: data?.message };
-  if (!res.ok) throw { kind: 'error', message: data?.message || ('HTTP ' + res.status) };
+  if (!res.ok) throw { kind: 'error', code: data?.error, message: data?.message || ('HTTP ' + res.status) };
   return data;
 }
 async function runSync() {
-  if (sync.state === 'local') return;
+  if (sync.state === 'local' || !auth.token) return;
   if (sync.busy) { sync.again = true; return; }
   sync.busy = true;
   setSyncState('busy');
   try {
-    Object.keys(pending.up).forEach(id => { if (!findProblem(id)) delete pending.up[id]; });
-    const ups = Object.keys(pending.up).map(findProblem).map(serializeProblem);
-    const dels = Object.entries(pending.del).map(([id, deletedAt]) => ({ id, deletedAt }));
-    const full = !sync.since;
-    const got = new Map();   // 伺服器回傳的變動（同一題以最後一次為準）
-    let now = null;
-    const take = res => { (res.problems || []).forEach(r => got.set(r.id, r)); if (res.now) now = res.now; };
-    if (!ups.length && !dels.length) {
-      take(await api('GET', 'deck?since=' + sync.since));
-    } else {
-      for (let k = 0; k < ups.length + dels.length; k += SYNC_CHUNK) {
-        const probs = ups.slice(k, k + SYNC_CHUNK);
-        const ds = dels.slice(Math.max(0, k - ups.length), Math.max(0, k + SYNC_CHUNK - ups.length));
-        // 第一批用原本的 since；後面的批次只需要這次上傳期間的變動
-        take(await api('POST', 'sync', { problems: probs, deletes: ds, since: k === 0 ? sync.since : (now || sync.since) }));
-        // 上傳成功：清除這些項目（若上傳期間又被修改則保留）
-        probs.forEach(p => { if (pending.up[p.id] === p.updatedAt) delete pending.up[p.id]; });
-        ds.forEach(d => { if (pending.del[d.id] === d.deletedAt) delete pending.del[d.id]; });
-        savePending();
-      }
-    }
-    mergeServer([...got.values()], full);
-    if (now) setSince(now);   // 舊版伺服器沒有 now：維持每次完整同步
+    await syncDeck();
+    await syncProgress();
     sync.last = Date.now();
-    setSyncState(Object.keys(pending.up).length || Object.keys(pending.del).length ? 'busy' : 'ok');
+    const left = Object.keys(pending.up).length + Object.keys(pending.del).length + Object.keys(progStore.pending).length;
+    setSyncState(left ? 'busy' : 'ok');
   } catch (e) {
     setSyncState(e.kind || 'error', e.message);
-    if (e.kind === 'login') {
-      if ($('pwModal').classList.contains('open')) $('pwMsg').innerHTML = `<b style="color:var(--bad)">${esc(e.message || '密碼不正確')}</b>`;
-      else if (!sync.askedPw) { sync.askedPw = true; openPw(); }
-    }
+    if (e.kind === 'login') logout(e.message || '登入已失效，請重新登入');
   } finally {
     sync.busy = false;
     if (sync.again || (sync.state === 'busy')) { sync.again = false; scheduleSync(300); }
   }
 }
+async function syncDeck() {
+  if (!isAdmin()) { pending.up = {}; pending.del = {}; }
+  Object.keys(pending.up).forEach(id => { if (!findProblem(id)) delete pending.up[id]; });
+  const ups = Object.keys(pending.up).map(findProblem).map(serializeProblem);
+  const dels = Object.entries(pending.del).map(([id, deletedAt]) => ({ id, deletedAt }));
+  const full = !sync.since;
+  const got = new Map();   // 伺服器回傳的變動（同一題以最後一次為準）
+  let now = null;
+  const take = res => { (res.problems || []).forEach(r => got.set(r.id, r)); if (res.now) now = res.now; };
+  if (!ups.length && !dels.length) {
+    take(await api('GET', 'deck?since=' + sync.since));
+  } else {
+    for (let k = 0; k < ups.length + dels.length; k += SYNC_CHUNK) {
+      const probs = ups.slice(k, k + SYNC_CHUNK);
+      const ds = dels.slice(Math.max(0, k - ups.length), Math.max(0, k + SYNC_CHUNK - ups.length));
+      take(await api('POST', 'sync', { problems: probs, deletes: ds, since: k === 0 ? sync.since : (now || sync.since) }));
+      probs.forEach(p => { if (pending.up[p.id] === p.updatedAt) delete pending.up[p.id]; });
+      ds.forEach(d => { if (pending.del[d.id] === d.deletedAt) delete pending.del[d.id]; });
+      savePending();
+    }
+  }
+  mergeServer([...got.values()], full);
+  if (now) setSince(now);
+}
+async function syncProgress() {
+  const ids = Object.keys(progStore.pending);
+  const got = [];
+  let now = null;
+  if (!ids.length) {
+    const r = await api('GET', 'progress?since=' + progStore.since);
+    got.push(...r.items); now = r.now;
+  } else {
+    for (let k = 0; k < ids.length; k += PROG_CHUNK) {
+      const items = ids.slice(k, k + PROG_CHUNK).map(id => ({ problemId: id, updatedAt: progStore.map[id]?.updatedAt || progStore.pending[id], data: progStore.map[id] }))
+        .filter(it => it.data);
+      const r = await api('POST', 'progress', { items, since: k === 0 ? progStore.since : (now || progStore.since) });
+      got.push(...r.items); now = r.now;
+      items.forEach(it => { if (progStore.pending[it.problemId] === it.updatedAt) delete progStore.pending[it.problemId]; });
+    }
+    ids.forEach(id => { if (!progStore.map[id]) delete progStore.pending[id]; });
+  }
+  let changed = false;
+  for (const it of got) {
+    const local = progStore.map[it.problemId];
+    if (local && (local.updatedAt || 0) >= it.updatedAt) continue;
+    let d = null;
+    try { d = cleanProg(JSON.parse(it.data)); } catch (e) {}
+    if (!d) continue;
+    d.updatedAt = it.updatedAt;
+    progStore.map[it.problemId] = d;
+    delete progStore.pending[it.problemId];
+    changed = true;
+  }
+  if (now) progStore.since = now;
+  saveProgNow();
+  if (changed) {
+    if (S.tab === 'play' && play) { renderMastery(); renderHistory(); }
+    if (S.tab === 'stats') renderStats();
+    if (S.tab === 'lib') { renderLib.key = null; renderLib(); }
+  }
+}
 function mergeServer(rows, full) {
   const onServer = new Set();
   let changed = false;
+  const admin = isAdmin();
   const live = rows.filter(r => !r.deleted);
-  // 新裝置（只有內建範例）而雲端已有題庫：直接採用雲端，不上傳範例
-  const adoptServer = full && deckPristine && live.length > 0;
+  // 新裝置（只有內建範例）而雲端已有題庫：直接採用雲端，不上傳範例。使用者一律以雲端為準。
+  const adoptServer = full && (!admin || (deckPristine && live.length > 0));
   for (const r of rows) {
     onServer.add(r.id);
     const local = findProblem(r.id);
     if (r.deleted) {
-      if (local && !pending.up[r.id] && (local.updatedAt || 0) <= r.updatedAt) { deck = deck.filter(p => p !== local); changed = true; }
+      if (local && !pending.up[r.id] && (!admin || (local.updatedAt || 0) <= r.updatedAt)) { deck = deck.filter(p => p !== local); changed = true; }
       continue;
     }
     if (local && pending.up[r.id] && (local.updatedAt || 0) >= r.updatedAt) continue;
-    if (!local || (local.updatedAt || 0) < r.updatedAt) {
+    if (!local || (admin ? (local.updatedAt || 0) < r.updatedAt : (local.updatedAt || 0) !== r.updatedAt)) {
       const n = normalizeProblem(r.data, 0).problem;
       if (!n) continue;
       n.updatedAt = r.updatedAt;
@@ -1560,10 +1744,10 @@ function mergeServer(rows, full) {
     pending.up[p.id] = p.updatedAt; needPush = true;
   }
   if (adoptServer) deckPristine = false;
-  if (!deck.length) {   // 雲端把題目全刪光了：放回範例，避免畫面沒有題目
+  if (!deck.length) {   // 雲端沒有任何題目：放回範例，避免畫面沒有題目（管理者會上傳範例）
     deck = DEFAULT_PROBLEMS.map((r, i) => normalizeProblem(r, i).problem);
-    deck.forEach(p => { p.updatedAt = Date.now(); pending.up[p.id] = p.updatedAt; });
-    needPush = true; changed = true;
+    deck.forEach(p => { p.updatedAt = Date.now(); if (admin) pending.up[p.id] = p.updatedAt; });
+    needPush = admin; changed = true;
   }
   if (needPush) { savePending(); scheduleSync(300); }
   if (changed) cleanupLegacy();
@@ -1574,12 +1758,13 @@ function mergeServer(rows, full) {
     else if (S.tab === 'play' && play.state === 'playing' && !play.moves.length) startProblem();
     else if (S.tab === 'play') renderPlay();
     if (S.tab === 'lib') renderLib();
+    if (S.tab === 'stats') renderStats();
     renderFilterSelects();
   }
 }
 const SYNC_TEXT = {
-  idle: ['', '同步'], busy: ['busy', '同步中…'], ok: ['ok', '已同步'],
-  offline: ['warn', '離線・稍後同步'], login: ['bad', '輸入同步密碼'], setup: ['bad', '伺服器未設定'],
+  idle: ['', ''], busy: ['busy', '同步中…'], ok: ['ok', '已同步'],
+  offline: ['warn', '離線・稍後同步'], login: ['bad', '請重新登入'], setup: ['bad', '伺服器未設定'],
   error: ['bad', '同步失敗'], local: ['', '僅本機'],
 };
 function setSyncState(state, message) {
@@ -1589,37 +1774,351 @@ function setSyncState(state, message) {
   const b = $('syncBtn');
   b.classList.remove('hidden');
   b.className = 'sync ' + cls;
-  b.querySelector('span').textContent = text;
-  b.title = message || text;
+  b.querySelector('span').textContent = auth.user ? auth.user.name : '未登入';
+  b.title = (message || text) + (auth.user ? `（${auth.user.name}）` : '');
+  if ($('acctModal').classList.contains('open')) $('acctSync').textContent = `同步狀態：${message || text || '—'}`;
 }
-function openPw() {
-  $('pwInput').value = getPw();
-  $('pwMsg').innerHTML = '';
-  $('pwModal').classList.add('open');
-  setTimeout(() => $('pwInput').focus(), 50);
+
+/* ---------- 登入 / 登出 ---------- */
+function showLogin(msg) {
+  $('loginMsg').innerHTML = msg ? `<b style="color:var(--bad)">${esc(msg)}</b>` : '';
+  $('loginCover').classList.add('open');
 }
-$('pwForm').addEventListener('submit', e => {
+$('loginForm').addEventListener('submit', async e => {
   e.preventDefault();
-  const v = $('pwInput').value.trim();
-  if (!v) { $('pwMsg').innerHTML = '<b style="color:var(--bad)">請輸入密碼</b>'; return; }
-  setPw(v);
-  $('pwMsg').textContent = '連線中…';
-  runSync().then(() => { if (sync.state === 'ok' || sync.state === 'busy') { $('pwModal').classList.remove('open'); toast('已連上雲端'); } });
+  const name = $('loginName').value.trim(), password = $('loginPw').value;
+  if (!name || !password) { $('loginMsg').innerHTML = '<b style="color:var(--bad)">請輸入名稱和密碼</b>'; return; }
+  $('loginMsg').textContent = '登入中…';
+  try {
+    const r = await api('POST', 'login', { name, password }, true);
+    onLoggedIn(r.token, r.user);
+    $('loginPw').value = '';
+    $('loginCover').classList.remove('open');
+    toast(`歡迎，${r.user.name}`);
+  } catch (err) {
+    $('loginMsg').innerHTML = `<b style="color:var(--bad)">${esc(err.kind === 'offline' ? '連不上伺服器，請確認網路' : (err.message || '登入失敗'))}</b>`;
+  }
 });
-$('btnPwCancel').onclick = () => $('pwModal').classList.remove('open');
-$('btnPwForget').onclick = () => {
-  if (!confirm('清除這台裝置上的同步密碼？之後只會存在本機，直到重新輸入密碼。')) return;
-  setPw(''); $('pwModal').classList.remove('open'); setSyncState('login', '請輸入同步密碼');
-};
-$('syncBtn').onclick = () => {
-  if (sync.state === 'login' || sync.state === 'ok') { openPw(); return; }
-  if (sync.state === 'setup' || sync.state === 'error') toast($('syncBtn').title);
+function onLoggedIn(token, user) {
+  const sameUser = auth.user && auth.user.id === user.id;
+  auth = { token, user };
+  saveAuth();
+  if (!sameUser) {   // 換了帳號：載入這個帳號自己的紀錄
+    progStore = loadProg();
+    recent = loadRecent();
+  }
+  applyRole();
+  startProblem();
+  if (S.tab === 'stats') renderStats();
+  if (S.tab === 'lib') { renderLib.key = null; renderLib(); }
+  setSyncState('busy');
   runSync();
+}
+function logout(msg) {
+  if (progTimer) saveProgNow();
+  if (auth.token && !msg) api('POST', 'logout').catch(() => {});
+  auth = { token: '', user: auth.user };   // 保留上次的帳號，下次登入同一人時直接沿用本機紀錄
+  saveAuth();
+  $('acctModal').classList.remove('open');
+  $('loginName').value = auth.user ? auth.user.name : '';
+  showLogin(msg);
+}
+
+/* ---------- 帳號視窗 ---------- */
+function openAcct() {
+  $('acctTitle').textContent = `${auth.user.name}（${isAdmin() ? '管理者' : '使用者'}）`;
+  const [, text] = SYNC_TEXT[sync.state] || SYNC_TEXT.error;
+  $('acctSync').textContent = `同步狀態：${$('syncBtn').title.replace(/（.*）$/, '') || text || '—'}`;
+  $('acctMsg').innerHTML = '';
+  $('acctModal').classList.add('open');
+  if (isAdmin()) loadUsers();
+}
+let usersCache = null;
+async function loadUsers() {
+  try {
+    const r = await api('GET', 'users');
+    usersCache = r.users; usersCache.max = r.max;
+    renderAcctList();
+    return usersCache;
+  } catch (e) { $('acctMsg').innerHTML = `<b style="color:var(--bad)">${esc(e.message || '讀取帳號失敗')}</b>`; return null; }
+}
+function renderAcctList() {
+  const list = (usersCache || []).filter(u => u.role !== 'admin');
+  $('acctCount').textContent = `（${list.length} / ${usersCache?.max ?? 10}）`;
+  $('acctList').innerHTML = list.length ? list.map(u => `
+    <div class="acct-row${u.disabled ? ' off' : ''}" data-uid="${u.id}">
+      <div class="n">${esc(u.name)}<small>${u.disabled ? '已停用・' : ''}作答 ${u.attempts} 次${u.last ? '・最後 ' + esc(fmtDate({ t: u.last })) : ''}</small></div>
+      <button class="btn small" data-a="rename">改名</button>
+      <button class="btn small" data-a="pw">重設密碼</button>
+      <button class="btn small" data-a="toggle">${u.disabled ? '啟用' : '停用'}</button>
+      <button class="btn small danger" data-a="del">刪除</button>
+    </div>`).join('') : '<div class="empty">還沒有使用者帳號</div>';
+}
+async function userAction(payload, okMsg) {
+  try {
+    const r = await api('POST', 'users', payload);
+    usersCache = r.users; usersCache.max = usersCache.max || 10;
+    renderAcctList();
+    $('acctMsg').innerHTML = `<b style="color:var(--good)">${esc(okMsg)}</b>`;
+    statsView.cache = {};
+    if (S.tab === 'stats') renderStats();
+    return true;
+  } catch (e) { $('acctMsg').innerHTML = `<b style="color:var(--bad)">${esc(e.message || '操作失敗')}</b>`; return false; }
+}
+$('acctList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const id = Number(b.closest('[data-uid]').dataset.uid), u = usersCache.find(x => x.id === id);
+  if (!u) return;
+  if (b.dataset.a === 'rename') {
+    const name = prompt(`把「${u.name}」改名為：`, u.name);
+    if (name && name.trim() !== u.name) userAction({ action: 'update', id, name: name.trim() }, '已改名');
+  }
+  if (b.dataset.a === 'pw') {
+    const pw = prompt(`「${u.name}」的新密碼（至少 4 個字元）：`);
+    if (pw) userAction({ action: 'update', id, password: pw }, `已重設「${u.name}」的密碼，舊裝置需要重新登入`);
+  }
+  if (b.dataset.a === 'toggle') userAction({ action: 'update', id, disabled: !u.disabled }, u.disabled ? '已啟用' : '已停用，這個帳號無法再登入');
+  if (b.dataset.a === 'del') {
+    if (confirm(`刪除帳號「${u.name}」？\n這個人的所有作答紀錄與統計都會一起刪除，無法復原。`)) userAction({ action: 'delete', id }, '已刪除');
+  }
+});
+$('acctAddForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('newName').value.trim(), password = $('newPw').value;
+  if (!name || !password) { $('acctMsg').innerHTML = '<b style="color:var(--bad)">請輸入名稱和密碼</b>'; return; }
+  if (await userAction({ action: 'create', name, password }, `已新增「${name}」`)) { $('newName').value = ''; $('newPw').value = ''; }
+});
+$('btnAcctClose').onclick = () => $('acctModal').classList.remove('open');
+$('btnSyncNow').onclick = () => { runSync(); toast('同步中…'); };
+$('btnLogout').onclick = () => {
+  const left = Object.keys(pending.up).length + Object.keys(pending.del).length + Object.keys(progStore.pending).length;
+  if (!confirm(left ? `還有 ${left} 筆資料沒上傳到雲端，登出後要等下次登入才會上傳。確定要登出？` : '確定要登出？')) return;
+  logout();
 };
+$('syncBtn').onclick = () => { if (auth.token) openAcct(); else showLogin(); };
 window.addEventListener('online', () => scheduleSync(200));
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && Date.now() - sync.last > 20000) scheduleSync(200);
 });
+
+/* =========================================================
+   統計
+   ========================================================= */
+const statsView = {
+  uid: null,          // null＝自己；管理者可切換成其他使用者的 id
+  cache: {},          // 其他使用者的紀錄：{ uid: { map, at } }
+};
+const DAY = 86400000;
+const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+const pct = (a, b) => (b ? Math.round(a / b * 100) + '%' : '—');
+async function statsMap() {
+  if (statsView.uid == null || statsView.uid === auth.user?.id) return progStore.map;
+  const c = statsView.cache[statsView.uid];
+  if (c && Date.now() - c.at < 60000) return c.map;
+  const r = await api('GET', 'progress?since=0&user=' + statsView.uid);
+  const map = {};
+  r.items.forEach(it => { try { const d = cleanProg(JSON.parse(it.data)); if (d) map[it.problemId] = d; } catch (e) {} });
+  statsView.cache[statsView.uid] = { map, at: Date.now() };
+  return map;
+}
+function renderStatSelects() {
+  // 大類／子類沿用練習的篩選（S.group / S.cat）
+  ['statGroup', 'statCat'].forEach((id, k) => { $(id).innerHTML = $(k ? 'playCat' : 'playGroup').innerHTML; $(id).value = k ? S.cat : S.group; });
+  if (isAdmin()) {
+    const users = usersCache || [];
+    const opts = [`<option value="">檢視：自己（${esc(auth.user.name)}）</option>`]
+      .concat(users.filter(u => u.id !== auth.user.id).map(u => `<option value="${u.id}">檢視：${esc(u.name)}${u.disabled ? '（停用）' : ''}</option>`));
+    $('statUser').innerHTML = opts.join('');
+    $('statUser').value = statsView.uid == null ? '' : String(statsView.uid);
+  }
+}
+let statsSeq = 0;
+async function renderStats() {
+  if (S.tab !== 'stats' || !auth.user) return;
+  renderFilterSelects();
+  if (isAdmin() && !LOCAL_MODE && (!usersCache || Date.now() - (loadUsers.at || 0) > 15000)) { loadUsers.at = Date.now(); await loadUsers(); }
+  renderStatSelects();
+  if (isAdmin()) renderOverview();
+  const seq = ++statsSeq;
+  let map;
+  try { map = await statsMap(); }
+  catch (e) { $('statMsg').textContent = '讀取紀錄失敗：' + (e.message || '請確認網路'); $('statMsg').classList.remove('hidden'); return; }
+  if (seq !== statsSeq) return;
+  $('statMsg').classList.add('hidden');
+  const list = pool(), viewingSelf = statsView.uid == null || statsView.uid === auth.user.id;
+
+  // ---- 數字 ----
+  let n = 0, ok = 0, ms = 0, tried = 0, mastered = 0, last = 0;
+  list.forEach(p => {
+    const g = map[p.id]; if (!g || !g.n) return;
+    tried++; n += g.n; ok += g.ok; ms += g.ms; last = Math.max(last, g.last);
+    if (g.level >= 4) mastered++;
+  });
+  const okTimes = list.flatMap(p => (map[p.id]?.log || []).filter(x => x.ok && x.ms > 0).map(x => x.ms));
+  const tile = (k, v, s) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s || '&nbsp;'}</div></div>`;
+  $('statTiles').innerHTML =
+    tile('正確率', pct(ok, n), n ? `答對 ${ok} / ${n} 次` : '還沒有作答') +
+    tile('平均用時', n ? fmtTime(ms / n) : '—', okTimes.length ? `答對時平均 ${fmtTime(okTimes.reduce((a, b) => a + b, 0) / okTimes.length)}` : '每次作答') +
+    tile('練過的題目', `${tried}<span style="font-size:15px;font-weight:600;color:var(--muted)"> / ${list.length}</span>`, `佔 ${pct(tried, list.length)}`) +
+    tile('熟練題數', mastered, '熟練度 4 以上') +
+    tile('最後練習', last ? fmtDate({ t: last }).split(' ')[0] : '—', last ? fmtDate({ t: last }).split(' ')[1] : '');
+
+  // ---- 近 30 天 ----
+  const today = dayStart(Date.now()), days = [];
+  for (let k = 29; k >= 0; k--) days.push({ t: today - k * DAY, n: 0, ok: 0, ms: 0 });
+  const first = days[0].t;
+  list.forEach(p => (map[p.id]?.log || []).forEach(x => {
+    if (x.t < first) return;
+    const d = days[Math.min(29, Math.floor((dayStart(x.t) - first) / DAY + 0.5))];
+    d.n++; d.ok += x.ok ? 1 : 0; d.ms += x.ms || 0;
+  }));
+  const labels = days.map(d => { const x = new Date(d.t); return `${x.getMonth() + 1}/${x.getDate()}`; });
+  drawChart($('chDaily'), { type: 'bar', labels, values: days.map(d => d.n), fmt: v => `${v} 次` });
+  drawChart($('chAcc'), { type: 'line', labels, values: days.map(d => (d.n ? d.ok / d.n * 100 : null)), fmt: v => Math.round(v) + '%', max: 100, yfmt: v => v + '%' });
+  drawChart($('chTime'), { type: 'line', labels, values: days.map(d => (d.n ? d.ms / d.n : null)), fmt: fmtTime, yfmt: fmtTime });
+
+  // ---- 熟悉度方塊圖（依大類・子類分組） ----
+  const groupsMap = new Map();
+  list.forEach(p => { const k = catLabel(p); if (!groupsMap.has(k)) groupsMap.set(k, []); groupsMap.get(k).push(p); });
+  $('heat').innerHTML = list.length ? [...groupsMap].map(([k, ps]) => {
+    const done = ps.filter(p => map[p.id]?.n).length;
+    return `<div class="heat-group">${esc(k)}・練過 ${done} / ${ps.length}</div><div class="heat">` + ps.map(p => {
+      const g = map[p.id], cls = !g || !g.n ? '' : g.level ? 'lv' + g.level : 'tried0';
+      const tip = `${p.id}${g && g.n ? `｜熟練度 ${g.level}｜答對 ${g.ok}/${g.n}` : '｜沒做過'}`;
+      return `<i class="${cls}" data-id="${esc(p.id)}" title="${esc(tip)}"></i>`;
+    }).join('') + '</div>';
+  }).join('') : '<div class="empty">這個範圍沒有題目</div>';
+  $('heat').dataset.self = viewingSelf ? '1' : '';
+  statsView.map = map;
+}
+function renderOverview() {
+  const users = usersCache || [];
+  if (!users.length) { $('ovTable').innerHTML = '<tr><td class="empty">還沒有帳號資料</td></tr>'; return; }
+  $('ovTable').innerHTML = '<tr><th>名稱</th><th>作答次數</th><th>正確率</th><th>平均用時</th><th>練過題數</th><th>熟練題數</th><th>最後練習</th></tr>' +
+    users.map(u => `<tr data-uid="${u.id}"${u.disabled ? ' style="color:var(--muted)"' : ''}>
+      <td>${esc(u.name)}${u.role === 'admin' ? '（管理者）' : ''}</td><td class="num">${u.attempts}</td><td class="num">${pct(u.correct, u.attempts)}</td>
+      <td class="num">${u.attempts ? fmtTime(u.totalMs / u.attempts) : '—'}</td><td class="num">${u.problems}</td><td class="num">${u.mastered}</td>
+      <td>${u.last ? esc(fmtDate({ t: u.last })) : '—'}</td></tr>`).join('');
+}
+function openProbStat(id) {
+  const p = findProblem(id), g = (statsView.map || {})[id] || EMPTY_PROG;
+  if (!p) return;
+  $('psTitle').textContent = `${catLabel(p)}・${p.title}`;
+  const okT = g.log.filter(x => x.ok && x.ms > 0).map(x => x.ms);
+  const tile = (k, v) => `<div class="tile"><div class="k">${k}</div><div class="v" style="font-size:20px">${v}</div></div>`;
+  $('psTiles').innerHTML = tile('熟練度', g.n ? g.level : '—') + tile('正確率', pct(g.ok, g.n)) +
+    tile('平均用時', g.n ? fmtTime(g.ms / g.n) : '—') + tile('最快', okT.length ? fmtTime(Math.min(...okT)) : '—');
+  $('btnPsPlay').classList.toggle('hidden', $('heat').dataset.self !== '1');
+  $('btnPsPlay').dataset.id = id;
+  $('probStatModal').classList.add('open');
+  const log = g.log.slice(-40);
+  drawChart($('chProb'), {
+    type: 'line', labels: log.map(x => fmtDate(x)), values: log.map(x => x.ms), fmt: fmtTime, yfmt: fmtTime,
+    pointColor: log.map(x => (x.ok ? null : '#d03b3b')), pointNote: log.map(x => (x.ok ? '答對' : '答錯 ✗')),
+    empty: '這題還沒有作答紀錄',
+  });
+}
+$('heat').addEventListener('click', e => { const t = e.target.closest('i[data-id]'); if (t) openProbStat(t.dataset.id); });
+$('btnPsClose').onclick = () => $('probStatModal').classList.remove('open');
+$('btnPsPlay').onclick = () => { $('probStatModal').classList.remove('open'); startProblem($('btnPsPlay').dataset.id); switchTab('play'); };
+$('statUser').onchange = e => { statsView.uid = e.target.value === '' ? null : Number(e.target.value); renderStats(); };
+$('statGroup').onchange = e => onFilterChange('group', e.target.value);
+$('statCat').onchange = e => onFilterChange('cat', e.target.value);
+$('ovTable').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-uid]'); if (!tr) return;
+  const id = Number(tr.dataset.uid);
+  statsView.uid = id === auth.user.id ? null : id;
+  renderStats();
+});
+
+/* ---------- 簡單圖表（單一數列；點一下或滑過顯示數值） ---------- */
+function drawChart(cv, o) {
+  const dim = fitCanvas(cv);
+  if (!dim) return;
+  const ctx = cv.getContext('2d'), { w, h } = dim;
+  ctx.clearRect(0, 0, w, h);
+  const vals = o.values, has = vals.filter(v => v != null);
+  const padL = 46, padR = 10, padT = 10, padB = 22;
+  const pw = w - padL - padR, ph = h - padT - padB;
+  cv._pts = [];
+  ctx.font = '11px -apple-system, sans-serif';
+  if (!has.length || (o.type === 'bar' && !has.some(v => v > 0))) {
+    ctx.fillStyle = '#6b6f76'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(o.empty || '這段期間沒有作答', w / 2, h / 2);
+    return;
+  }
+  let max = o.max || Math.max(...has) || 1;
+  if (!o.max) { const step = o.yfmt === fmtTime ? timeStep(max / 3) : niceStep(max / 3); max = Math.ceil(max / step) * step; }
+  const y = v => padT + ph - (v / max) * ph;
+  const n = vals.length, xw = pw / n, x = i => padL + xw * (i + 0.5);
+  // 格線與 y 軸刻度（淡）
+  ctx.strokeStyle = '#ebe6dc'; ctx.lineWidth = 1; ctx.fillStyle = '#6b6f76';
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let k = 0; k <= 3; k++) {
+    const v = max * k / 3, yy = Math.round(y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(w - padR, yy); ctx.stroke();
+    ctx.fillText(o.yfmt ? o.yfmt(Math.round(v)) : String(Math.round(v)), padL - 6, yy);
+  }
+  // x 軸標籤：只標頭、中、尾
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  [0, Math.floor((n - 1) / 2), n - 1].filter((v, i, a) => a.indexOf(v) === i).forEach(i => {
+    const lab = String(o.labels[i] || '').split(' ')[0];
+    ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
+    ctx.fillText(lab, i === 0 ? padL : i === n - 1 ? w - padR : x(i), h - padB + 6);
+  });
+  const blue = '#2a78d6';
+  if (o.type === 'bar') {
+    const bw = Math.max(2, Math.min(18, xw - 2));
+    ctx.fillStyle = blue;
+    vals.forEach((v, i) => {
+      if (!v) return;
+      const top = y(v), bh = padT + ph - top, r = Math.min(4, bw / 2, bh);
+      ctx.beginPath();
+      ctx.moveTo(x(i) - bw / 2, padT + ph); ctx.lineTo(x(i) - bw / 2, top + r);
+      ctx.quadraticCurveTo(x(i) - bw / 2, top, x(i) - bw / 2 + r, top);
+      ctx.lineTo(x(i) + bw / 2 - r, top); ctx.quadraticCurveTo(x(i) + bw / 2, top, x(i) + bw / 2, top + r);
+      ctx.lineTo(x(i) + bw / 2, padT + ph); ctx.closePath(); ctx.fill();
+    });
+  } else {
+    ctx.strokeStyle = blue; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let pen = false;
+    vals.forEach((v, i) => { if (v == null) { pen = false; return; } pen ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)); pen = true; });
+    ctx.stroke();
+    vals.forEach((v, i) => {
+      if (v == null) return;
+      const c = o.pointColor?.[i];
+      ctx.beginPath(); ctx.arc(x(i), y(v), c ? 5 : 3.5, 0, 7);
+      ctx.fillStyle = '#fff'; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = c || blue; ctx.stroke();
+      if (c) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(x(i), y(v), 2.5, 0, 7); ctx.fill(); }
+    });
+  }
+  cv._pts = vals.map((v, i) => (v == null ? null : { x: x(i), y: o.type === 'bar' ? y(v) : y(v),
+    text: `${o.labels[i]}：${o.fmt ? o.fmt(v) : v}${o.pointNote ? '・' + o.pointNote[i] : ''}` }));
+  bindChartTip(cv);
+}
+function timeStep(v) { return [5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600].map(x => x * 1000).find(x => x >= v) || 3600000; }
+function niceStep(v) { const p = Math.pow(10, Math.floor(Math.log10(v || 1))), m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; }
+function bindChartTip(cv) {
+  if (cv._tipBound) return;
+  cv._tipBound = true;
+  const box = cv.parentElement;
+  const tip = document.createElement('div'); tip.className = 'chart-tip hidden'; box.appendChild(tip);
+  const show = e => {
+    const r = cv.getBoundingClientRect(), px = e.clientX - r.left;
+    let best = null, bd = 1e9;
+    (cv._pts || []).forEach(p => { if (p && Math.abs(p.x - px) < bd) { bd = Math.abs(p.x - px); best = p; } });
+    if (!best || bd > 30) { tip.classList.add('hidden'); return; }
+    tip.textContent = best.text;
+    tip.style.left = Math.min(Math.max(best.x + cv.offsetLeft, 70), box.clientWidth - 70) + 'px';
+    tip.style.top = (best.y + cv.offsetTop) + 'px';
+    tip.classList.remove('hidden');
+  };
+  cv.addEventListener('pointermove', show);
+  cv.addEventListener('pointerdown', show);
+  cv.addEventListener('pointerleave', () => tip.classList.add('hidden'));
+}
 
 /* =========================================================
    共用
@@ -1631,9 +2130,11 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
 }
 function switchTab(tab) {
+  if (tab === 'edit' && !isAdmin()) tab = 'play';
   S.tab = tab;
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === tab));
-  ['play', 'edit', 'lib'].forEach(t => $('view-' + t).classList.toggle('active', t === tab));
+  ['play', 'stats', 'edit', 'lib'].forEach(t => $('view-' + t).classList.toggle('active', t === tab));
+  if (tab === 'stats') renderStats();
   if (tab === 'play') renderPlay();
   if (tab === 'edit') { if (!ed) newEditor(); else renderEditor(); }
   if (tab === 'lib') renderLib();
@@ -1652,8 +2153,8 @@ $('libGroup').onchange = e => onFilterChange('group', e.target.value);
 $('playCat').onchange = e => onFilterChange('cat', e.target.value);
 $('libCat').onchange = e => onFilterChange('cat', e.target.value);
 $('btnClearHist').onclick = () => {
-  const p = curProblem();
-  if (p.history.length && confirm(`清除「${p.title}」的所有作答紀錄？`)) { p.history = []; touch(p); saveDeck(); renderHistory(); }
+  const p = curProblem(), g = prog(p.id);
+  if (g.history.length && confirm(`清除「${p.title}」的作答紀錄清單？（統計數字不受影響）`)) { progW(p.id).history = []; touchProg(p.id); renderHistory(); }
 };
 bindBoardTap($('playBoard'), onPlayTap);
 bindBoardTap($('editBoard'), onEditTap);
@@ -1676,7 +2177,7 @@ $('btnDelGroup').onclick = () => {
   if (!target.length) return;
   const name = S.cat === 'ALL' ? `大類「${S.group}」` : `「${S.group} · ${S.cat}」`;
   if (target.length >= deck.length) return toast('題庫至少要保留一題，不能刪除全部題目');
-  if (!confirm(`確定要刪除${name}的全部 ${target.length} 題嗎？\n作答紀錄也會一起刪除，其他裝置同步後也會刪除。`)) return;
+  if (!confirm(`確定要刪除${name}的全部 ${target.length} 題嗎？\n所有人的裝置同步後都會刪除。`)) return;
   deleteProblems(target.map(p => p.id));
   toast(`已刪除 ${target.length} 題`);
   S.group = 'ALL'; S.cat = 'ALL'; renderLib.key = null;
@@ -1707,16 +2208,21 @@ document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e =
 // 版面尺寸改變（旋轉 iPad、分割畫面）時重畫
 let resizeTimer;
 const redraw = () => { if (S.tab === 'play') drawBoard($('playBoard'), playView()); if (S.tab === 'edit' && ed) renderEditor(); };
+let statResize;
+window.addEventListener('resize', () => { if (S.tab === 'stats') { clearTimeout(statResize); statResize = setTimeout(renderStats, 150); } });
 window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(redraw, 80); });
 if (window.ResizeObserver) {
   const ro = new ResizeObserver(() => { clearTimeout(resizeTimer); resizeTimer = setTimeout(redraw, 30); });
   document.querySelectorAll('.board-wrap').forEach(el => ro.observe(el));
 }
 
+applyRole();
 cleanupLegacy();
 newEditor();
 startProblem(deck[0].id);
-if (sync.state !== 'local') runSync();
+if (LOCAL_MODE) setSyncState('local');
+else if (auth.token) { setSyncState('busy'); runSync(); }
+else { $('loginName').value = auth.user ? auth.user.name : ''; setSyncState('login'); showLogin(); }
 </script>
 </body>
 </html>
